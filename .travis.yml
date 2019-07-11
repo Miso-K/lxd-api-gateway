@@ -1,0 +1,39 @@
+---
+language: python
+python: "3.5"
+
+sudo: required
+dist: trusty
+
+before_install:
+  - sudo add-apt-repository ppa:ubuntu-lxc/stable -y
+  - sudo apt-get update
+  - sudo apt-get install lxc lxc-dev python3-lxc -y
+
+install:
+  - pip install -r requirements.txt
+  - pip install codecov
+
+addons:
+  apt:
+    packages:
+    - python-dev
+    - build-essential
+
+script:
+  - pip install git+https://github.com/lxc/lxc.git#subdirectory=src/python-lxc
+  - sudo sh -c ". /home/travis/virtualenv/python3.5/bin/activate; coverage run tests.py"
+
+after_success:
+  - codecov
+
+notifications:
+  webhooks:
+    urls:
+      - secure: "puBXp3bzCY3fmppHXyTZ73QrXyA/j+hM1FPDAWecx+YVACd33k6HKKUDTPpAa2BPo2QJPLN9Hu5bH3MKTL4IIkberbWwta2sGr2RigCR4I5SzlQb2ejoR3BaN5I2QOosO6jH3Yr3t044iGDK33EBCP2dNP0qtQBSZkiZpXwVKdUmgsHdqtGJoe9r2a5NIYOVEfjjXvhSE8j/PxlNKMXnN6plQYS2QdE1pVvxaL5r3FKNXqfIV0Tsudoi75yGck6RIr9n8WjoRv/TzG3eSOzQSv54UGOBrqe5cXCcRgTw2f2a3EuxSVX25nnFuCQo+uiQhFYhYtwlu/gsNcv9nWRF+ml0ScgA0DIWB0Mhr+Grqj+HKEeEEpJsqrVkHxlvz5OUt2w2MZ/HgcE0dtkb2XBkbt5kNsz0MI1S01EC2hOdnFezuWB20z8YNobvhCk3VNJ1Su1D5kZ/jJst8qoq1FmJC3OAaVUD28mKn2B1PB0beI1rK92HQA9rsDt7ki0lVe2FQ/LZPfB6ZCb6Q2WRaBd+jbCnL7OFNlcUbjltF1mzNRk54sowYMdB23mUQaY7X3YSDv0MXeIl0akFIZs+gAZRrJi+HQqhFV6JkZLUp4JDgO7jY/j4Hkjd1aKoc4Cf+0hFMeZFZFpAhyobLwi6Vjfd62lPi4GG7ef7TOSsU0DvsIQ="
+      - secure: "o+c7Cma8yuAXEjswRxHkkhZuUexUjRHHPcDhedhASiAhEV8baEB6EufUsd5JBO5GbKuHk4Un/ud4fYYmnkSXgvSrwDpiR8wLdh3X1DnKo86bRfsCdqal2b5l50AocBLPSxSrj3w4THxaHZAkMsm9MPjSUX+MCo3i/3iBP0Ntq2wmZDrEvl30OHJVR/4bvEHUFun9ZgyRL592AIS8DKIeW7guqLAnhllgOSH7+O+xpyhnXpcAY4gXeGqNu7+k1ty/UF953KQ6wZI71xQ3mqwa1jF5/SfPsu1x7RgyUpx8pOpHVr0/0Epe2yVCZBGigQny8m5IQMn3NimbVOG7Rm3XxPM2NFz3df4RJ8BtuHi7dgiH+F08rX04baGjCGpiY/akD+CSYCF+LM8+4gHMocJX+VonV6gnL4wlT7Ckp4SMr71rKcmi+KoyiMK181zEDlvRgpjoiGtv6vm6ykWx8fs/hljf93HGq/N8nZewOxIaPvoLiG0V/UKNp38QmnKq1Xoz2xzeNXyTj7FcFkOtQZaCfiztycxXYiPFHPykaRHfy1V6y2l5Q4KLdY1tVV3J1nr/Vo0w/9YyKEQsrrfRH1pY4aA3xvw23p7FFIodW+7q289XYXB7kS/S/8D9qVn/U01vF0QE9snkw3v6azqXqZkxkfq8gbb1OfRvc6oQlFim3Uw="
+    on_success: always
+    on_failure: never
+    on_start: never
+    on_cancel: never
+    on_error: never

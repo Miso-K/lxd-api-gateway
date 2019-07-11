@@ -1,0 +1,4 @@
+[submodule "pip/flask-restplus"]
+	path = pip/flask-restplus
+	url = https://github.com/lxc-webpanel/flask-restplus.git
+	branch = master

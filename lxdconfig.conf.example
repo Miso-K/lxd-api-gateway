@@ -1,0 +1,18 @@
+[local]
+
+[remote]
+endpoint = https://127.0.0.1:8443
+cert_crt = lxd-vpsadmin.crt
+cert_key = lxd-vpsadmin.key
+verify = False
+
+[smtp]
+sender = lxd@example.com
+recipient = support@example.com
+server = smtp.example.com
+port = 587
+login =
+password =
+
+[app]
+production_name = LXDmanager.com
