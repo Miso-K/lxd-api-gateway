@@ -49,6 +49,32 @@ python3 install/setup.py
 
 ---
 
+### LXD host settings
+
+Change "example.com" to your domain. * would make it accessible from everywhere.
+
+```shell
+sudo lxc config set core.https_address [::]:8443
+sudo lxc config set core.https_allowed_origin "*.example.com"
+sudo lxc config set core.https_allowed_methods "GET, POST, PUT, DELETE, OPTIONS"
+sudo lxc config set core.https_allowed_headers "Content-Type"
+sudo lxc config set core.trust_password true
+sudo service lxd restart # sometimes is required
+```
+
+#### Generate authentication certificates (Self Signed)
+
+```
+openssl genrsa -out lxd.key 4096 # Generate a private key.
+openssl req -new -key lxd.key -out lxd.csr # Create a certificate request.
+openssl x509 -req -days 3650 -in lxd.csr -signkey lxd.key -out lxd.crt # Generate an auto signed certificate.
+lxc config trust add lxd.crt # Tells LXC to use this certificate for auth.
+```
+
+Copy lxd.crt and lxd.key to installation folder and edit lxdconfig.conf settings.
+
+---
+
 ### Run the server
 #### Werkzeug *(dev only)*
 ```shell

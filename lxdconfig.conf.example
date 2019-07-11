@@ -2,8 +2,8 @@
 
 [remote]
 endpoint = https://127.0.0.1:8443
-cert_crt = lxd-vpsadmin.crt
-cert_key = lxd-vpsadmin.key
+cert_crt = lxd.crt
+cert_key = lxd.key
 verify = False
 
 [smtp]
