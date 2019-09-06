@@ -24,7 +24,7 @@ apt install python3-venv
 cd lxd-api-gateway
 
 # create virtual env
-python3 -m venv lxd-rest-env
+python3 -m venv lgw-env
 
 # activate env
 source lgw-env/bin/activate
