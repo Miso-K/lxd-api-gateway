@@ -2,7 +2,7 @@ lxd-api-gateway
 
 RESTful API for LXD with USER access limitations
 
-Use it with [Dashboard](https://gitlab.skhosting.eu/Kolarik/vue-dashboard)
+Use it with [Dashboard](https://github.com/Miso-K/lxd-api-gateway)
 
 [![Python version](https://img.shields.io/badge/Python-3.7-blue.svg)](https://www.python.org/downloads/release/python-350/)
 
@@ -11,7 +11,7 @@ Use it with [Dashboard](https://gitlab.skhosting.eu/Kolarik/vue-dashboard)
 ## Installation
 ### Clone
 ```shell
-git clone --recursive https://gitlab.skhosting.eu/Kolarik/lxd-rest
+git clone --recursive https://github.com/Miso-K/lxd-api-gateway
 ```
 
 ### Install requirements
