@@ -251,7 +251,7 @@ def lxd_api_get(endpoint):
     :return: response:
     """
 
-    r = requests.get(get_config()['endpoint'] + '/1.0/' + endpoint + '', verify=get_config()['verify'], cert=get_config()['cert'])
+    r = requests.get(get_config()['endpoint'] + '/1.0/' + endpoint + '', verify=get_config()['verify'], cert=get_config()['cert'], timeout=10)
     #print(r.text)
     return r
 

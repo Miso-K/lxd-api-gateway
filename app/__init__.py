@@ -173,7 +173,7 @@ jwt = flask_jwt_extended.JWTManager(app)
 
 
 # Config for redis
-redis_store = redis.StrictRedis(host=app.config['REDIS_HOST'], port=app.config['REDIS_PORT'], db=0,
+redis_store = redis.StrictRedis(host=app.config['REDIS_HOST'], port=app.config['REDIS_PORT'], db=app.config['REDIS_DB'],
                                 decode_responses=True)
 
 

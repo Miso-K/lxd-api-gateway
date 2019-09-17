@@ -29,9 +29,12 @@ def populate_containers_table():
     """
 
     all = []
-    res = lxd_api_get('containers')
-    for c in res.json()['metadata']:
-        all.append(c[16:])  # get container name from api url
+    try:
+        res = lxd_api_get('containers')
+        for c in res.json()['metadata']:
+            all.append(c[16:])  # get container name from api url
+    except Exception as e:
+        print(e)
 
     current_containers_list = tuple(all)
     database_containers_list = [str(i.name) for i in Container.query.all()]
