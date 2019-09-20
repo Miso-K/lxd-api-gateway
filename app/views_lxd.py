@@ -75,11 +75,12 @@ class ContainersList(Resource):
             c = Container.query.filter_by(name=data['attributes']['name']).first()
             if not c:
                 config = {'name': data['attributes']['name'],
-                          'source': {'type': 'image',
-                                     'mode': 'pull',
-                                     'server': 'https://uk.images.linuxcontainers.org',
-                                     'protocol': 'simplestreams',
-                                     'alias': data['attributes']['source']['alias']},
+                          #'source': {'type': 'image',
+                          #           'mode': 'pull',
+                          #           'server': 'https://uk.images.linuxcontainers.org',
+                          #           'protocol': 'simplestreams',
+                          #           'alias': data['attributes']['source']['alias']},
+                          'source': data['attributes']['source'],
                           'config': {'limits.cpu': str(data['attributes']['config']['limits_cpu']),
                                      'limits.memory': data['attributes']['config']['limits_memory']}}
                           #'devices': {'root': {'path': '/', 'pool': 'lxd','type': 'disk', 'size': '10GB'}}}
@@ -140,7 +141,7 @@ class Containers(Resource):
 
     @user_has('ct_update')
     @api.expect(containers_fields_put, validate=True)
-    #@api.marshal_with(containers_fields_put)
+    @api.marshal_with(containers_fields_put)
     @api.doc(responses={
         200: 'Container config changed',
         404: 'Container doesn\'t exists',
@@ -149,6 +150,7 @@ class Containers(Resource):
     def put(self, id, d=None):
         """
         Change container name and config
+        # use patch instead of put to set only selected config
         :param id:
         :param d:
         :return: container data
@@ -165,35 +167,23 @@ class Containers(Resource):
             c = Container.query.get(id)
         except:
             api.abort(code=404, message='Container doesn\'t exists')
-
         if c.name and (id in current_identity.containers or current_identity.admin):
-            if 'name' in data['attributes']:
-                if data['attributes']['name'] != c.name:
-                    if c.status == 'Stopped':
-                        try:
-                            c.rename(data['attributes']['name'], wait=True)
-                        except Exception as e:
-                            print("rename:"+str(e))
-                            api.abort(code=500, message='Error while instantiate container')
-                        c.name = data['attributes']['name']
-                        db.session.commit()
-                    else:
-                        print("not stopped")
-                        api.abort(code=500, message='Renaming of running container not allowed')
             if 'limits_cpu' in data['attributes']['config']:
-                c.config['limits.cpu'] = data['attributes']['config']['limits_cpu']
+                config = {
+                          'config': {'limits.cpu': str(data['attributes']['config']['limits_cpu'])}}
                 try:
-                    c.save(wait=True)
-                except:
-                    print("cpu")
-                    api.abort(code=500, message='Error while instantiate container')
+                    res = lgw.lxd_api_patch('containers/'+c.name, data=config)
+                    print(res.text)
+                except Exception as e:
+                    api.abort(code=500, message='Can\'t create container')
             if 'limits_memory' in data['attributes']['config']:
-                c.config['limits.memory'] = data['attributes']['config']['limits_memory']
+                config = {
+                    'config': {'limits.memory': data['attributes']['config']['limits_memory']}}
                 try:
-                    c.save(wait=True)
-                except:
-                    print("ram")
-                    api.abort(code=500, message='Error while instantiate container')
+                    res = lgw.lxd_api_patch('containers/'+c.name, data=config)
+                    print(res.text)
+                except Exception as e:
+                    api.abort(code=500, message='Can\'t create container')
 
         else:
             api.abort(code=404, message='Container doesn\'t exists')

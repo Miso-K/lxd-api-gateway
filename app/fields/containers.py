@@ -74,7 +74,8 @@ containers_fields_attributes_post = api.model('ContainersFieldsAttributesPost', 
 
 containers_fields_attributes_put = api.model('ContainersFieldsAttributesPut', {
     'name': fields.String,
-    'config': fields.Nested(lxd_container_config_post)
+    'config': fields.Raw,
+    'devices': fields.Raw
 })
 
 containers_fields_with_relationships_post_put = api.model('ContainersFieldsWithRelationshipsPost', {
