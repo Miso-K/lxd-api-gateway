@@ -40,6 +40,13 @@ def _container_find(c):
     return container
 
 
+def _request_find(r):
+    request = Request.query.get(r)
+    if not(request):
+        raise RequestDoesntExist(r)
+    return request
+
+
 user_group_table = db.Table(
     'user_group',
     db.Column(
@@ -82,6 +89,20 @@ user_container_table = db.Table(
     )
 )
 
+user_request_table = db.Table(
+    'user_request',
+    db.Column(
+        'user_id',
+        db.Integer,
+        db.ForeignKey('users.id')
+    ),
+    db.Column(
+        'request_id',
+        db.Integer,
+        db.ForeignKey('requests.id')
+    )
+)
+
 
 class User(db.Model):
     __tablename__ = 'users'
@@ -121,6 +142,15 @@ class User(db.Model):
         'id',
         creator=_container_find
     )
+    _requests = db.relationship(
+        'Request',
+        secondary=user_request_table,
+    )
+    requests = association_proxy(
+        '_requests',
+        'id',
+        creator=_request_find
+    )
 
     def __init__(
         self,
@@ -142,7 +172,8 @@ class User(db.Model):
         otp_secret=None,
         language=None,
         groups=None,
-        containers=None
+        containers=None,
+        requests=None
     ):
 
         self.admin = admin
@@ -171,6 +202,10 @@ class User(db.Model):
             self.containers = [container for container in containers]
         elif containers and isinstance(containers, int):
             self.containers = [containers]
+        if requests and isinstance(requests, list):
+            self.requests = [req for req in requests]
+        elif requests and isinstance(requests, int):
+            self.requests = [requests]
 
     def hash_password(self, password):
         self.password = pwd_context.hash(password)
@@ -255,11 +290,14 @@ class User(db.Model):
         _json['relationships'] = {}
         _json['relationships']['groups'] = {}
         _json['relationships']['containers'] = {}
+        _json['relationships']['requests'] = {}
 
         _json['relationships']['groups']['data'] = [
             group.__jsonapi__('flat') for group in self._groups]
         _json['relationships']['containers']['data'] = [
             container.__jsonapi__('flat') for container in self._containers]
+        _json['relationships']['requests']['data'] = [
+            req.__jsonapi__('flat') for req in self._requests]
 
         return _json
 
@@ -436,3 +474,71 @@ class Container(db.Model):
 
     def __repr__(self):
         return '<Container %r>' % self.id
+
+
+class Request(db.Model):
+    __tablename__ = 'requests'
+    id = db.Column(db.Integer, primary_key=True)
+    action = db.Column(db.String(255), unique=False)
+    text = db.Column(db.String(255), unique=False)
+    status = db.Column(db.String(255), unique=False)
+    created_on = db.Column(db.DateTime, nullable=False)
+    changed_on = db.Column(db.DateTime)
+
+    _users = db.relationship(
+        'User',
+        secondary=user_request_table,
+    )
+    users = association_proxy(
+        '_users',
+        'id',
+        creator=_user_find
+    )
+
+    def __init__(
+        self,
+        action=None,
+        text=None,
+        status=None,
+        created_on=None,
+        changed_on=None,
+        users=None
+    ):
+
+        self.action = action
+        self.text = text
+        self.status = status
+        self.created_on = datetime.datetime.now()
+        self.changed_on = changed_on
+
+        if users and isinstance(users, list):
+            self.users = [user for user in users]
+        elif users and isinstance(users, int):
+            self.users = [users]
+
+    def __jsonapi__(self, group=None):
+        _json = {
+            'type': 'requests',
+            'id': self.id,
+            'attributes': {
+                'action': self.action,
+                'text': self.text,
+                'status': self.status,
+                'created_on': self.created_on,
+                'changed_on': self.changed_on
+            }
+        }
+
+        if group == 'flat':
+            return _json
+
+        _json['relationships'] = {}
+        _json['relationships']['users'] = {}
+
+        _json['relationships']['users']['data'] = [
+            user.__jsonapi__('flat') for user in self._users]
+
+        return _json
+
+    def __repr__(self):
+        return '<Request %r>' % self.id

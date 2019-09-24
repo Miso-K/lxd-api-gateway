@@ -18,6 +18,6 @@ except KeyError:
     ssl = False
 
 if ssl:
-	app.run(host=host, port=port, threaded=True, ssl_context=(app.config['SSL_CERT'], app.config['SSL_KEY']))
+	app.run(host=host, port=port, threaded=True, ssl_context=(app.config['SSL_CERT'], app.config['SSL_KEY']), debug=True)
 else:
-	app.run(host=host, port=port, threaded=True)
+	app.run(host=host, port=port, threaded=True, debug=True)

@@ -20,6 +20,8 @@ nslgw.add_resource(GroupsList, '/groups')
 nslgw.add_resource(Groups, '/groups/<int:id>')
 nslgw.add_resource(AbilitiesList, '/abilities')
 nslgw.add_resource(Abilities, '/abilities/<int:id>')
+nslgw.add_resource(RequestsList, '/requests')
+nslgw.add_resource(Requests, '/requests/<int:id>')
 
 # Containers routes
 nslxc.add_resource(ContainersList, '/containers')

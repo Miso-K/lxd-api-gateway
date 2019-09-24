@@ -621,6 +621,99 @@ class Abilities(Resource):
 
 
 ##################
+# New API Requests #
+##################
+
+class RequestsList(Resource):
+    decorators = [jwt_required, otp_confirmed]
+
+    @api.marshal_with(requests_fields_get_many)
+    def get(self):
+        """
+        Get requests list
+        """
+        current_identity = import_user()
+
+        requests = Request.query.all()
+        requests_list = []
+
+        for req in requests:
+            if req.id in current_identity.requests or current_identity.admin:
+                requests_list.append(req.__jsonapi__())
+
+        return {'data': requests_list}
+
+    @api.expect(requests_fields_post, validate=True)
+    @api.marshal_with(requests_fields_get)
+    def post(self):
+        """
+        Create request
+        """
+        data = request.get_json()['data']
+
+        req = Request(text=data['attributes']['text'])
+        req.action = data['attributes']['action']
+        req.status = data['attributes']['status']
+
+        try:
+            req.users = list(id['id'] for id in data[
+                'relationships']['users']['data'])
+        except KeyError:
+            pass
+
+        db.session.add(req)
+        db.session.commit()
+
+        return {'data': req.__jsonapi__()}, 201
+
+
+class Requests(Resource):
+    decorators = [jwt_required, otp_confirmed]
+
+    @api.marshal_with(requests_fields_get)
+    def get(self, id):
+        """
+        Get request
+        """
+        req = Request.query.get(id)
+
+        if not req:
+            api.abort(code=404, message='Request not found')
+
+        return {'data': req.__jsonapi__()}
+
+    @api.expect(requests_fields_put, validate=True)
+    @api.marshal_with(requests_fields_get)
+    def put(self, id):
+        """
+        Update request
+        """
+        req = Request.query.get(id)
+
+        if not req:
+            api.abort(code=404, message='Request not found')
+
+        data = request.get_json()['data']
+
+        if 'text' in data['attributes']:
+            req.text = data['attributes']['text']
+        if 'status' in data['attributes']:
+            req.status = data['attributes']['status']
+        req.changed_on = datetime.datetime.now()
+
+        try:
+            req.users = list(id['id'] for id in data[
+                'relationships']['users']['data'])
+        except KeyError:
+            pass
+
+        if len(data) > 0:
+            db.session.commit()
+
+        return {'data': req.__jsonapi__()}
+
+
+##################
 # Other API #
 ##################
 
