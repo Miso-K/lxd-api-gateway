@@ -643,7 +643,7 @@ class RequestsList(Resource):
 
         return {'data': requests_list}
 
-    @api.expect(requests_fields_post, validate=True)
+    #@api.expect(requests_fields_post, validate=True)
     @api.marshal_with(requests_fields_get)
     def post(self):
         """
@@ -651,15 +651,20 @@ class RequestsList(Resource):
         """
         data = request.get_json()['data']
 
-        req = Request(text=data['attributes']['text'])
+        req = Request(message=data['attributes']['message'])
         req.action = data['attributes']['action']
         req.status = data['attributes']['status']
-
-        try:
-            req.users = list(id['id'] for id in data[
-                'relationships']['users']['data'])
-        except KeyError:
-            pass
+        req.meta_data = data['attributes']['meta_data']
+        #req.users = list('1',)
+        if 'relationships' in data:
+            try:
+                req.users = list(id['id'] for id in data[
+                    'relationships']['users']['data'])
+            except KeyError:
+                pass
+        else:
+            current_identity = import_user()
+            req.users = list(str(current_identity.id),)
 
         db.session.add(req)
         db.session.commit()
@@ -695,8 +700,8 @@ class Requests(Resource):
 
         data = request.get_json()['data']
 
-        if 'text' in data['attributes']:
-            req.text = data['attributes']['text']
+        if 'message' in data['attributes']:
+            req.message = data['attributes']['message']
         if 'status' in data['attributes']:
             req.status = data['attributes']['status']
         req.changed_on = datetime.datetime.now()
@@ -716,43 +721,6 @@ class Requests(Resource):
 ##################
 # Other API #
 ##################
-
-class UsersRequest(Resource):
-    decorators = [jwt_required, otp_confirmed]
-
-    @user_has('users_request')
-    @api.marshal_with(requests_fields_get)
-    @api.expect(requests_fields_post, validate=True)
-    def post(self):
-        """
-        Users request
-        Send email to administrator (and user if required) for support or new container order
-        :return status
-        """
-        current_identity = import_user()
-
-        request_data = request.get_json()
-        subject = request_data['subject']
-        message = request_data['message']
-        copy = request_data['copy']
-        useremail = None
-        ret = "No response from SMTP, email not send"
-
-        if copy:
-            useremail = current_identity.email
-
-        #print(current_identity.__dict__)
-
-        print("Subject: " + subject)
-        print("Message: " + message)
-        print("Send copy: " + str(copy))
-
-        #odkomentuj ked pojde api
-        ret = lgw.send_request(message, subject, useremail)
-
-        return {'status': ret}
-
-
 class LXDConfig(Resource):
     decorators = [jwt_required, otp_confirmed]
 

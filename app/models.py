@@ -480,7 +480,8 @@ class Request(db.Model):
     __tablename__ = 'requests'
     id = db.Column(db.Integer, primary_key=True)
     action = db.Column(db.String(255), unique=False)
-    text = db.Column(db.String(255), unique=False)
+    message = db.Column(db.String(255), unique=False)
+    meta_data = db.Column(db.JSON, unique=False)
     status = db.Column(db.String(255), unique=False)
     created_on = db.Column(db.DateTime, nullable=False)
     changed_on = db.Column(db.DateTime)
@@ -498,7 +499,8 @@ class Request(db.Model):
     def __init__(
         self,
         action=None,
-        text=None,
+        message=None,
+        meta_data=None,
         status=None,
         created_on=None,
         changed_on=None,
@@ -506,7 +508,8 @@ class Request(db.Model):
     ):
 
         self.action = action
-        self.text = text
+        self.message = message
+        self.meta_data = meta_data
         self.status = status
         self.created_on = datetime.datetime.now()
         self.changed_on = changed_on
@@ -522,7 +525,8 @@ class Request(db.Model):
             'id': self.id,
             'attributes': {
                 'action': self.action,
-                'text': self.text,
+                'message': self.message,
+                'meta_data': self.meta_data,
                 'status': self.status,
                 'created_on': self.created_on,
                 'changed_on': self.changed_on

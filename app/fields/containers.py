@@ -58,18 +58,26 @@ containers_fields_attributes = api.model('ContainersFieldsAttributes', {
 
 #require MB in memory string
 lxd_container_config_post = api.model('LxdContainerConfig', {
-    'limits_cpu': fields.String(default=None, pattern='^([0-9])*$'),
-    'limits_memory': fields.String(default=None, pattern='^([0-9]*MB|GB)*$'),
-    'limits_disk': fields.String(default=None, pattern='^([0-9]*MB|GB)*$')
+    'limits_cpu': fields.Raw(default=None),
+    'limits_memory': fields.String(default=None, pattern='^([0-9]*MB|[0-9]*GB)*$'),
+    'limits_disk': fields.String(default=None, pattern='^([0-9]*MB|[0-9]*GB)*$')
 })
 
+# copy not working when uncomment
 containers_fields_attributes_post = api.model('ContainersFieldsAttributesPost', {
     'name': fields.String(required=True, pattern='^(?!\s*$).+'),
-    'source': fields.Nested(api.model('ContainersSourcePost', {
-        'type': fields.String(default='image'),
-        'alias': fields.String(required=True, pattern='^(?!\s*$).+', default='ubuntu/xenial')
-    })),
-    'config': fields.Nested(lxd_container_config_post)
+    'source': fields.Raw,
+    #'source': fields.Nested(api.model('ContainersSourcePost', {
+    #    'type': fields.String(default=None),
+    #    'alias': fields.String(pattern='^(?!\s*$).+', default=None),
+    #    'mode': fields.String(default=None),
+    #    'server': fields.String(default=None),
+    #    'protocol': fields.String(default=None),
+    #    'container_only': fields.Raw(default=None),
+    #    'source': fields.String(default=None)
+    #})),
+    #'config': fields.Nested(lxd_container_config_post)
+    'config': fields.Raw
 })
 
 containers_fields_attributes_put = api.model('ContainersFieldsAttributesPut', {

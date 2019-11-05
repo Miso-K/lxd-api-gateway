@@ -5,7 +5,8 @@ from app import api
 
 requests_fields_attributes = api.model('RequestsFieldsAttributes', {
     'action': fields.String,
-    'text': fields.String,
+    'message': fields.String,
+    'meta_data': fields.String,
     'status': fields.String,
     'created_on': fields.DateTime(dt_format='rfc822'),
     'changed_on': fields.DateTime(dt_format='rfc822')
@@ -24,15 +25,15 @@ requests_fields_with_relationships_put = api.model('RequestsFieldsWithRelationsh
 
 
 requests_fields_attributes_put = api.model('RequestsFieldsAttributesPut', {
-    'action': fields.String,
-    'text': fields.String,
+    'message': fields.String,
     'status': fields.String
 })
 
 requests_fields_attributes_post = api.model('RequestsFieldsAttributesPost', {
     'action': fields.String,
-    'text': fields.String,
-    'status': fields.String
+    'message': fields.String,
+    'status': fields.String,
+    'meta_data': fields.String
 })
 
 _requests_fields_post = api.inherit('RequestsFieldsPost', requests_fields_with_relationships_put, {

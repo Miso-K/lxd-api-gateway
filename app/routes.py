@@ -36,7 +36,6 @@ nslxc.add_resource(ContainersState, '/containers/<int:id>/state')
 
 # Special and config routes
 nslgw.add_resource(CtsStats, '/stats')
-nslgw.add_resource(UsersRequest, '/request')
 nslgw.add_resource(LXDConfig, '/lxdconfig')
 nslgw.add_resource(LXDCerts, '/lxdcerts')
 nslxc.add_resource(LxcHostResources, '/resources')

@@ -49,8 +49,8 @@ class ContainersList(Resource):
         return {'data': containers}
 
     @user_has('ct_create')
-    #@api.expect(containers_fields_post, validate=True)
-    #@api.marshal_with(containers_fields_get)
+    @api.expect(containers_fields_post, validate=False)
+    @api.marshal_with(containers_fields_get)
     @api.doc(responses={
         201: 'Container created',
         409: 'Container already exists',
@@ -98,13 +98,31 @@ class ContainersList(Resource):
                     # Get container ID
                     container = Container.query.filter_by(
                         name=data['attributes']['name']).first()
-                    # Add container to allowed user's containers
-                    user = User.query.get(current_identity.id)
-                    user.containers.append(container.id)
-                    db.session.commit()
+                    # Add container to allowed users
+                    if current_identity.admin:
+                        try:
+                            users_id = list(id['id'] for id in data['relationships']['users']['data'])
+                            for user_id in users_id:
+                                user = User.query.get(user_id)
+                                user.containers.append(container.id)
+                                db.session.commit()
+                        except KeyError:
+                            pass
+                        except AttributeError:
+                            api.abort(code=500, message='User doesn\'t exists')
+                    # Add container to current user
+                    else:
+                        user = User.query.get(current_identity.id)
+                        user.containers.append(container.id)
+                        db.session.commit()
                 else:
                     api.abort(code=res.status_code, message='Error when creating container')
-                return res.json()
+
+                container_json = container.__jsonapi__()
+                #container_json['attributes'] = res.json()['metadata']
+                #res_state = lgw.lxd_api_get('containers/' + container.name + '/state')
+                #container_json['attributes']['state'] = res_state.json()['metadata']
+                return {'data': container_json}
             api.abort(code=409, message='Container already exists')
 
 
