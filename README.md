@@ -16,6 +16,9 @@ git clone --recursive https://github.com/Miso-K/lxd-api-gateway
 
 ### Install requirements
 ```shell
+# Installation require Redis DB for storing jwt tokens 
+apt install redis-server
+
 # install python dependencies
 apt update
 apt install python3-pip python3-dev build-essential libssl-dev libffi-dev python3-setuptools
