@@ -51,6 +51,8 @@ def cts_stats(containers):
     disk_count = 0
     disk_count_bytes = 0
     disk_usage_count = 0
+    price_count = 0
+
     for ct in containers:
         ec = lxd_api_get('containers/'+ct).json()['metadata']
         sc =lxd_api_get('containers/' + ct + '/state').json()['metadata']
@@ -104,6 +106,14 @@ def cts_stats(containers):
         if disk_count_bytes:
             disk_count = disk_count_bytes / (1024 * 1024 * 1024)
             disk_count = '{0:.2f}'.format(disk_count)
+
+        '''price'''
+        try:
+            price = ec['expanded_config']['user.price']
+        except:
+            price = None
+        if price:
+            price_count += float(price)
     
     cts = {
         'type': 'stats',
@@ -124,6 +134,9 @@ def cts_stats(containers):
         'disk': {
             'disk_count': disk_count,
             'disk_usage': disk_usage_count
+        },
+        'price': {
+            'price_count': price_count
         }
     }    
 
@@ -150,7 +163,7 @@ def convert_bytes(size, type):
     return bytes
 
 
-def send_request(message, subject, useremail=None):
+def send_request(subject, message, useremail=None):
     """
     Send mail to admin and reply to user if usermail set
     :param message:
@@ -162,41 +175,45 @@ def send_request(message, subject, useremail=None):
     config = configparser.ConfigParser()
     config.read('lxdconfig.conf')
 
-    sender = config['smtp']['sender']
-    to = config['smtp']['recipient']
-    cc = useremail
+    enabled = config['smtp']['sender']
+    if enabled:
+        sender = config['smtp']['sender']
+        to = config['smtp']['recipient']
+        cc = useremail
 
-    # print("Sending email" + message + " subject: " + subject)
+        # print("Sending email" + message + " subject: " + subject)
 
-    content = MIMEText(message, 'html')
+        content = MIMEText(message, 'html')
 
-    try:
-        if cc is not None:
-            receivers = [cc] + [to]
-        else:
-            receivers = to
-        msg = MIMEMultipart('alternative')
-        msg['Subject'] = subject
-        msg['From'] = sender
-        msg['To'] = to
-        msg['Cc'] = cc
-        msg["Date"] = formatdate(localtime=True)
-        msg.attach(content)
-        mailserver = smtplib.SMTP(config['smtp']['server'], config['smtp']['port'], timeout=30)
-        mailserver.ehlo()
-        mailserver.starttls()
-        mailserver.ehlo()
-        mailserver.login(config['smtp']['login'], config['smtp']['password'])
         try:
-            # mailserver.sendmail(sender, receivers, msg.as_string())
-            mailserver.send_message(msg, sender, receivers)
-            # print("Successfully sent email")
-            return "Successfully sent email"
-        finally:
-            mailserver.quit()
-    except smtplib.SMTPException:
-        # print("Error: unable to send email")
-        return "Error: unable to send email"
+            if cc is not None:
+                receivers = [cc] + [to]
+            else:
+                receivers = to
+            msg = MIMEMultipart('alternative')
+            msg['Subject'] = subject
+            msg['From'] = sender
+            msg['To'] = to
+            msg['Cc'] = cc
+            msg["Date"] = formatdate(localtime=True)
+            msg.attach(content)
+            mailserver = smtplib.SMTP(config['smtp']['server'], config['smtp']['port'], timeout=30)
+            mailserver.ehlo()
+            mailserver.starttls()
+            mailserver.ehlo()
+            mailserver.login(config['smtp']['login'], config['smtp']['password'])
+            try:
+                # mailserver.sendmail(sender, receivers, msg.as_string())
+                mailserver.send_message(msg, sender, receivers)
+                print("Successfully sent email")
+                return "Successfully sent email"
+            except:
+                return "Error: unable to send email"
+            finally:
+                mailserver.quit()
+        except smtplib.SMTPException:
+            print("Error: unable to send email")
+            return "Error: unable to send email"
 
 
 def send_otp_email(key, useremail=None):
@@ -210,38 +227,40 @@ def send_otp_email(key, useremail=None):
     config = configparser.ConfigParser()
     config.read('lxdconfig.conf')
 
-    subject = 'Access key to vpsadmin'
+    subject = 'Access key to ' + config['app']['production_name']
     message = 'Your otp access key is: ' + str(key)
 
-    sender = config['smtp']['sender']
-    to = useremail
+    enabled = config['smtp']['sender']
+    if enabled:
+        sender = config['smtp']['sender']
+        to = useremail
 
-    # print("Sending email" + " subject: " + subject + "message: " + message)
+        # print("Sending email" + " subject: " + subject + "message: " + message)
 
-    content = MIMEText(message, 'html')
+        content = MIMEText(message, 'html')
 
-    try:
-        msg = MIMEMultipart('alternative')
-        msg['Subject'] = subject
-        msg['From'] = sender
-        msg['To'] = to
-        msg["Date"] = formatdate(localtime=True)
-        msg.attach(content)
-        mailserver = smtplib.SMTP(config['smtp']['server'], config['smtp']['port'], timeout=30)
-        mailserver.ehlo()
-        mailserver.starttls()
-        mailserver.ehlo()
-        mailserver.login(config['smtp']['login'], config['smtp']['password'])
         try:
-            # mailserver.sendmail(sender, receivers, msg.as_string())
-            mailserver.send_message(msg, sender, to)
-            # print("Successfully sent email")
-            return "Successfully sent email"
-        finally:
-            mailserver.quit()
-    except smtplib.SMTPException:
-        # print("Error: unable to send email")
-        return "Error: unable to send email"
+            msg = MIMEMultipart('alternative')
+            msg['Subject'] = subject
+            msg['From'] = sender
+            msg['To'] = to
+            msg["Date"] = formatdate(localtime=True)
+            msg.attach(content)
+            mailserver = smtplib.SMTP(config['smtp']['server'], config['smtp']['port'], timeout=30)
+            mailserver.ehlo()
+            mailserver.starttls()
+            mailserver.ehlo()
+            mailserver.login(config['smtp']['login'], config['smtp']['password'])
+            try:
+                # mailserver.sendmail(sender, receivers, msg.as_string())
+                mailserver.send_message(msg, sender, to)
+                # print("Successfully sent email")
+                return "Successfully sent email"
+            finally:
+                mailserver.quit()
+        except smtplib.SMTPException:
+            # print("Error: unable to send email")
+            return "Error: unable to send email"
 
 
 def lxd_api_get(endpoint):

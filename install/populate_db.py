@@ -107,8 +107,11 @@ def _run():
         groups=[1]
     )
 
-    user.hash_password('admin1234')
-
+    passwd = os.getenv('ADMIN_PASSWORD')
+    if passwd:
+        user.hash_password(passwd)
+    else:
+        user.hash_password('admin1234')
     db.session.add(user)
     db.session.commit()
 

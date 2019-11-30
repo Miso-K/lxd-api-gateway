@@ -42,6 +42,6 @@ nslxc.add_resource(LxcHostResources, '/resources')
 nslxc.add_resource(LxcCheckConfig, '/checkconfig')
 
 # Snapshots routes - not tested for production
-# nslxc.add_resource(SnapshotsList, '/containers/<string:name>/snapshots')
-# nslxc.add_resource(Snapshots, '/containers/<string:name>/snapshots/<string:sname>')
-# nslxc.add_resource(SnapshotsRestore, '/containers/<string:name>/snapshots/<string:sname>/restore')
+nslxc.add_resource(SnapshotsList, '/containers/<int:id>/snapshots')
+nslxc.add_resource(Snapshots, '/containers/<int:id>/snapshots/<string:name>')
+nslxc.add_resource(SnapshotsRestore, '/containers/<int:id>/snapshots/<string:name>/restore')

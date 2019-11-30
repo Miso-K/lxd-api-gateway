@@ -43,9 +43,12 @@ def check_if_token_is_revoked(decrypted_token):
     """
     jti = decrypted_token['jti']
     entry = redis_store.get('access_jti:' + jti)
+    entry_refresh = redis_store.get('refresh_jti:' + jti)
     # print(str(entry) + ' ' + str(jti))
-    if entry is None:
+    if entry is None and entry_refresh is None:
         return True
+    #if entry_refresh is None:
+    #    return True
     return entry == 'true'
 
 

@@ -3,7 +3,7 @@
 from flask import request
 from flask_restplus import Resource
 from flask_jwt_extended import fresh_jwt_required, jwt_required, create_access_token, \
-    jwt_refresh_token_required, create_refresh_token, get_jti, get_raw_jwt
+    jwt_refresh_token_required, create_refresh_token, get_jti, get_raw_jwt, get_jwt_identity
 from app import db, api, redis_store, app
 from .decorators import *
 from .fields.auth import *
@@ -107,20 +107,21 @@ class AuthOtp(Resource):
 
 
 class AuthRefresh(Resource):
-    decorators = [jwt_required, otp_confirmed]
+    decorators = [jwt_refresh_token_required]
 
-    @api.marshal_with(auth_fields_get)
+    #@api.marshal_with(auth_fields_get)
     def post(self):
         """
         Get new token with valid token
         :return new access_token
         """
-        current_identity = import_user()
-        access_token = create_access_token(identity=current_identity)
+        user = import_user()
+        user.otp_confirmed = True
+        access_token = create_access_token(identity=user, fresh=False)
         access_jti = get_jti(encoded_token=access_token)
         redis_store.set('access_jti:' + access_jti, 'false', app.config['ACCESS_TOKEN_EXPIRES'])
         ret = {
-            'access_token': create_access_token(identity=current_identity)
+            'access_token': access_token
         }
         return ret
 
@@ -343,7 +344,7 @@ class Me(Resource):
         return {'data': current_identity.__jsonapi__()}
 
     @user_has('me_edit')
-    @api.expect(users_fields_put, validate=True)
+    #@api.expect(users_fields_put, validate=True)
     @api.marshal_with(users_fields_get)
     def put(self):
         """
@@ -669,6 +670,11 @@ class RequestsList(Resource):
         db.session.add(req)
         db.session.commit()
 
+        mail_message = 'User:' + str(
+            req.__jsonapi__()['relationships']['users']['data'][0]['attributes']['username']) + ' Data: ' + str(
+            req.__jsonapi__()['attributes'])
+        lgw.send_request(data['attributes']['message'], mail_message)
+
         return {'data': req.__jsonapi__()}, 201
 
 
@@ -715,6 +721,11 @@ class Requests(Resource):
         if len(data) > 0:
             db.session.commit()
 
+        mail_message = 'User:' + str(
+            req.__jsonapi__()['relationships']['users']['data'][0]['attributes']['username']) + ' Data: ' + str(
+            req.__jsonapi__()['attributes'])
+        lgw.send_request(data['attributes']['message'], mail_message)
+
         return {'data': req.__jsonapi__()}
 
 
@@ -724,8 +735,8 @@ class Requests(Resource):
 class LXDConfig(Resource):
     decorators = [jwt_required, otp_confirmed]
 
-    @user_has('lxd_config')
-    @api.marshal_with(lxdconfig_fields_get)
+    #@user_has('lxd_config')
+    #@api.marshal_with(lxdconfig_fields_get)
     def get(self):
         """
         Get LXD config
@@ -733,7 +744,6 @@ class LXDConfig(Resource):
         """
 
         current_identity = import_user()
-
         data = {}
 
         if current_identity.admin:
@@ -745,25 +755,87 @@ class LXDConfig(Resource):
                 data['cert_key'] = Config['remote']['cert_key']
                 data['verify'] = Config['remote']['verify']
 
-                data['sender'] = Config['smtp']['sender']
-                data['recipient'] = Config['smtp']['recipient']
-                data['server'] = Config['smtp']['server']
-                data['port'] = Config['smtp']['port']
-                data['login'] = Config['smtp']['login']
-                data['password'] = Config['smtp']['password']
+                if 'smtp' in Config:
+                    data['smtp'] = {}
+                    data['smtp']['enabled'] = Config['smtp']['enabled']
+                    data['smtp']['sender'] = Config['smtp']['sender']
+                    data['smtp']['recipient'] = Config['smtp']['recipient']
+                    data['smtp']['server'] = Config['smtp']['server']
+                    data['smtp']['port'] = Config['smtp']['port']
+                    data['smtp']['login'] = Config['smtp']['login']
+                    data['smtp']['password'] = Config['smtp']['password']
+
+                if 'price' in Config:
+                    print(Config['price']['enabled'])
+                    data['price'] = {}
+                    data['price']['periodes'] = {}
+                    data['price']['enabled'] = Config['price']['enabled']
+                    data['price']['cpu'] = Config['price']['cpu']
+                    data['price']['memory'] = Config['price']['memory']
+                    data['price']['disk'] = Config['price']['disk']
+                    data['price']['periodes']['month'] = Config['price']['periodes.month']
+                    data['price']['periodes']['months'] = Config['price']['periodes.months']
+                    data['price']['periodes']['halfyear'] = Config['price']['periodes.halfyear']
+                    data['price']['periodes']['year'] = Config['price']['periodes.year']
+                    data['price']['periodes']['years'] = Config['price']['periodes.years']
+                #except:
+                    #data['price'] = None
+                #    print(data)
+
+                if 'storage' in Config:
+                    data['storage'] = {}
+                    data['storage']['enabled'] = Config['storage']['enabled']
+                    data['storage']['pool_name'] = Config['storage']['pool_name']
+
+                    #data['storage'] = None
 
                 data['production_name'] = Config['app']['production_name']
             except Exception as e:
                 api.abort(code=404, message='Error when read config file.')
 
-            return {'data': {'attributes': data}}
+            return {'data': {'attributes': data, 'type': 'lxdconfig', 'id': '1'}}
+
+        else:
+            Config = configparser.ConfigParser()
+            try:
+                Config.read('lxdconfig.conf')
+                if 'smtp' in Config:
+                    data['smtp'] = {}
+                    data['smtp']['enabled'] = Config['smtp']['enabled']
+
+                if 'price' in Config:
+                    print(Config['price']['enabled'])
+                    data['price'] = {}
+                    data['price']['periodes'] = {}
+                    data['price']['enabled'] = Config['price']['enabled']
+                    data['price']['cpu'] = Config['price']['cpu']
+                    data['price']['memory'] = Config['price']['memory']
+                    data['price']['disk'] = Config['price']['disk']
+                    data['price']['periodes']['month'] = Config['price']['periodes.month']
+                    data['price']['periodes']['months'] = Config['price']['periodes.months']
+                    data['price']['periodes']['halfyear'] = Config['price']['periodes.halfyear']
+                    data['price']['periodes']['year'] = Config['price']['periodes.year']
+                    data['price']['periodes']['years'] = Config['price']['periodes.years']
+
+                if 'storage' in Config:
+                    data['storage'] = {}
+                    data['storage']['enabled'] = Config['storage']['enabled']
+                    data['storage']['pool_name'] = Config['storage']['pool_name']
+
+                    # data['storage'] = None
+
+                data['production_name'] = Config['app']['production_name']
+            except Exception as e:
+                api.abort(code=404, message='Error when read config file.')
+
+            return {'data': {'attributes': data, 'type': 'lxdconfig', 'id': '1'}}
 
         api.abort(code=404, message='You has not admin privileges')
 
 
     @user_has('lxd_config')
     @api.marshal_with(lxdconfig_fields_get)
-    @api.expect(lxdconfig_fields_post, validate=True)
+    #@api.expect(lxdconfig_fields_post, validate=True)
     def post(self):
         """
         Set LXD config
@@ -772,6 +844,7 @@ class LXDConfig(Resource):
         current_identity = import_user()
 
         data = request.get_json()
+        #print(data)
 
         if current_identity.admin:
 
@@ -786,15 +859,33 @@ class LXDConfig(Resource):
             Config.set('remote', 'verify', data['verify'])
 
             Config.add_section('smtp')
-            Config.set('smtp', 'sender', data['sender'])
-            Config.set('smtp', 'recipient', data['recipient'])
-            Config.set('smtp', 'server', data['server'])
-            Config.set('smtp', 'port', data['port'])
-            Config.set('smtp', 'login', data['login'])
-            Config.set('smtp', 'password', data['password'])
+            Config.set('smtp', 'enabled', str(data['smtp']['enabled']))
+            Config.set('smtp', 'sender', data['smtp']['sender'])
+            Config.set('smtp', 'recipient', data['smtp']['recipient'])
+            Config.set('smtp', 'server', data['smtp']['server'])
+            Config.set('smtp', 'port', data['smtp']['port'])
+            Config.set('smtp', 'login', data['smtp']['login'])
+            Config.set('smtp', 'password', data['smtp']['password'])
 
             Config.add_section('app')
             Config.set('app', 'production_name', data['production_name'])
+
+            Config.add_section('price')
+            #if data['price']['enabled']:
+            Config.set('price', 'enabled', str(data['price']['enabled']))
+            Config.set('price', 'cpu', data['price']['cpu'])
+            Config.set('price', 'memory', data['price']['memory'])
+            Config.set('price', 'disk', data['price']['disk'])
+            Config.set('price', 'periodes.month', data['price']['periodes']['month'])
+            Config.set('price', 'periodes.months', data['price']['periodes']['months'])
+            Config.set('price', 'periodes.halfyear', data['price']['periodes']['halfyear'])
+            Config.set('price', 'periodes.year', data['price']['periodes']['year'])
+            Config.set('price', 'periodes.years', data['price']['periodes']['years'])
+
+            Config.add_section('storage')
+            #if data['storage']['enabled']:
+            Config.set('storage', 'enabled', str(data['storage']['enabled']))
+            Config.set('storage', 'pool_name', data['storage']['pool_name'])
 
             Config.write(cfgfile)
             cfgfile.close()

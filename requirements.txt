@@ -10,4 +10,4 @@ psutil==5.2.2
 onetimepass==1.0.1
 redis==3.2.1
 requests
-uwsgi
+gunicorn

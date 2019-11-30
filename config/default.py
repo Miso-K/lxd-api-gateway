@@ -21,7 +21,7 @@ SWAGGER_UI_DOC_EXPANSION = 'list'  # none, list or full
 
 ALLOW_ORIGIN = '*'  # CORS
 
-# Set this config keys before run to production
+# Change this config keys before run to production
 SECRET_KEY = u'ça cest une vrai appli ! il faut que la clé soit bien longue'
 JWT_SECRET_KEY = u'ça cest une vrai appli ! il faut que la clé soit bien longue'
 

@@ -16,13 +16,13 @@ snapshots_fields_attributes_post = api.model('SnapshotsFieldsAttributesPost', {
 })
 
 snapshots_fields_attributes_put = api.model('SnapshotsFieldsAttributesPut', {
-    'name': fields.String(required=True, pattern='^(?!\s*$).+'),
-    'stateful': fields.String
+    'expires_at': fields.String
 })
 
 
 _snapshots_fields_get = api.model('SnapshotsFieldsGet', {
     'type': fields.String(default='snapshots'),
+    'id': fields.Integer,
     'attributes': fields.Nested(snapshots_fields_attributes),
 })
 

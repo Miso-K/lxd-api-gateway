@@ -81,9 +81,23 @@ class ContainersList(Resource):
                           #           'protocol': 'simplestreams',
                           #           'alias': data['attributes']['source']['alias']},
                           'source': data['attributes']['source'],
-                          'config': {'limits.cpu': str(data['attributes']['config']['limits_cpu']),
-                                     'limits.memory': data['attributes']['config']['limits_memory']}}
+                          'profile': 'zfs',
+                          'config': {},
+                          #'devices': {'root': {'path': '/', 'pool': 'zfs', 'type': 'disk', 'size': '3GB'}}
+                          }
                           #'devices': {'root': {'path': '/', 'pool': 'lxd','type': 'disk', 'size': '10GB'}}}
+                if 'limits_cpu' in data['attributes']['config']:
+                    config['config']['limits.cpu'] = str(data['attributes']['config']['limits_cpu'])
+                if 'limits_memory' in data['attributes']['config']:
+                    config['config']['limits.memory'] = data['attributes']['config']['limits_memory']
+                if 'price' in data['attributes']['config']:
+                    config['config']['user.price'] = data['attributes']['config']['price']
+                if 'pool_name' in data['attributes']['config']:
+                    if data['attributes']['config']['pool_name'] != '':
+                        config['devices'] = {'root': {'path': '/', 'pool': data['attributes']['config']['pool_name'], 'type': 'disk'}}
+                        if 'limits_disk' in data['attributes']['config']:
+                            config['devices']['root']['size'] = data['attributes']['config']['limits_disk']
+
                 try:
                     res = lgw.lxd_api_post('containers', data=config)
                     print(res.text)
@@ -119,6 +133,7 @@ class ContainersList(Resource):
                     api.abort(code=res.status_code, message='Error when creating container')
 
                 container_json = container.__jsonapi__()
+                print(res.json())
                 #container_json['attributes'] = res.json()['metadata']
                 #res_state = lgw.lxd_api_get('containers/' + container.name + '/state')
                 #container_json['attributes']['state'] = res_state.json()['metadata']
@@ -490,19 +505,17 @@ class ContainersExec(Resource):
             'interactive': True,            # Whether to allocate a pts device instead of PIPEs
             'width': 80,                    # Initial width of the terminal (optional)
             'height': 25,                   # Initial height of the terminal (optional)
+
         }
         # this part working for /console api
-        # data = {
-        #    'width': 80,
-        #    'height': 25
-        # }
+        # data = {}
 
         current_identity = import_user()
         try:
             # c = Container.query.filter_by(name=name).first()  # USE FOR QUERY BY NAME
             c = Container.query.filter_by(id=id).first()
             if c and (c.id in current_identity.containers or current_identity.admin):
-                res = lgw.lxd_api_post('containers/' + c.name + '/exec', data)
+                res = lgw.lxd_api_post('containers/' + c.name + '/console', {}) #'/exec', data
                 # return res.json()
                 return {'data': {'type': 'terminal', 'id': id, 'attributes': res.json()}}, 201
             else:
@@ -528,23 +541,22 @@ class SnapshotsList(Resource):
         current_identity = import_user()
         container = Container.query.get(id)
         snapshots = []
-        
-        #If exists
-        client = lgw.lxd_client()
-        c = client.containers.get(container.name)
 
-        if c.name and (id in current_identity.containers or current_identity.admin):
-            all = c.snapshots.all()
-            for snap in all:
-                snapshot_json = {'attributes': {'name': snap.name, 'created_at': snap.created_at,
-                                                'stateful': snap.stateful}}
+        if container.name and (id in current_identity.containers or current_identity.admin):
+            res = lgw.lxd_api_get('containers/' + container.name + '/snapshots?recursion=1') #recursion=1 returns objects
+            for i, r in enumerate(res.json()['metadata']):
+                #print(r['name'] + r['created_at'] + str(r['stateful']))
+                snapshot_json = {'type': 'snapshots', 'id': i, 'attributes': {'name': r['name'], 'created_at': r['created_at'],
+                                                'stateful': r['stateful']}}
                 snapshots.append(snapshot_json)
-                
-        return {'data': snapshots}
+            #return {'data': res.json()['metadata']}
+            return {'data': snapshots}
+        else:
+            api.abort(code=404, message='Container not found')
 
     @user_has('snapshot_create')
     @api.expect(snapshots_fields_post, validate=True)
-    @api.marshal_with(snapshots_fields_get)
+    #@api.marshal_with(snapshots_fields_get)
     @api.doc(responses={
         201: 'Snapshot created',
         409: 'Snapshot already exists',
@@ -559,21 +571,14 @@ class SnapshotsList(Resource):
         current_identity = import_user()
         container = Container.query.get(id)
 
-        # If exists
-        client = lgw.lxd_client()
-        c = client.containers.get(container.name)
-
-        if c.name and (id in current_identity.containers or current_identity.admin):
-            snapname = data['attributes']['name']
-            if not c.snapshots.create(snapname):
+        if container.name and (id in current_identity.containers or current_identity.admin):
+            if not container:
                 api.abort(code=409, message='Snapshot name already exists')
             else:
-                time.sleep(20)
-                snap = c.snapshots.get(snapname)
-                snapshot_json = {
-                    'attributes': {'name': snap.name, 'created_at': snap.created_at, 'stateful': snap.stateful}}
-
-                return {'data': snapshot_json}
+                res = lgw.lxd_api_post(
+                    'containers/' + container.name + '/snapshots', {'name': data['attributes']['name'], 'stateful': False})  # recursion=1 returns objects
+                #print(res.json())
+                return {'data': res.json()['metadata']}
 
         api.abort(code=500, message='Can\'t create container')
 
@@ -590,18 +595,17 @@ class Snapshots(Resource):
         current_identity = import_user()
         container = Container.query.get(id)
 
-        #If exists
-        client = lgw.lxd_client()
-        c = client.containers.get(container.name)
-
-        if c.name and (id in current_identity.containers or current_identity.admin):
+        if container.name and (id in current_identity.containers or current_identity.admin):
             try:
-                snap = c.snapshots.get(name)
-                snapshot_json = {'attributes': {'name': snap.name, 'created_at': snap.created_at, 'stateful': snap.stateful }}
+                res = lgw.lxd_api_get('containers/' + container.name + '/snapshots/' + name)
+                r = res.json()['metadata']
+                print(r)
+                snapshot_json = {'type': 'snapshots', 'attributes': {'name': r['name'], 'created_at': r['created_at'],
+                                                                     'stateful': r['stateful']}}
+                return {'data': snapshot_json}
             except:
                 api.abort(code=404, message='Snapshot doesn\'t exists')
-                
-            return {'data': snapshot_json}
+
         api.abort(code=404, message='Container doesn\'t exists')
 
     @user_has('snapshot_rename')
@@ -611,7 +615,6 @@ class Snapshots(Resource):
         """
         Update snapshot
         """
-        client = lgw.lxd_client()
         if d:
             data = d
         else:
@@ -620,24 +623,19 @@ class Snapshots(Resource):
         current_identity = import_user()
         container = Container.query.get(id)
 
-        c = client.containers.get(container.name)
+        if container.name and (id in current_identity.containers or current_identity.admin):
+            try:
+                res = lgw.lxd_api_get('containers/' + container.name + '/snapshots/' + name)
+                r = res.json()['metadata']
+                if r['expires_at']:
+                    try:
+                        res = lgw.lxd_api_put('containers/' + container.name + '/snapshots/' + name, {'expires_at': data['attributes']['expires_at']})
+                        return {}, 204
+                    except:
+                        api.abort(code=500, message='Error deleting snapshot')
+            except:
+                api.abort(code=404, message='Snapshot doesn\'t exists')
 
-        if c.name and (id in current_identity.containers or current_identity.admin):
-            if 'name' in data['attributes']:
-                try:
-                    snap = c.snapshots.get(name)
-                except:
-                    api.abort(code=404, message='Snapshot doesn\'t exists')
-                if name == snap.name:
-                    snap.rename(data['attributes']['name'])
-                else:
-                    api.abort(
-                        code=500, message='Error while rename snapshot')
-
-            snapshot_json = {
-                'attributes': {'name': snap.name, 'created_at': snap.created_at, 'stateful': snap.stateful}}
-
-            return {'data': snapshot_json}
         api.abort(code=404, message='Container doesn\'t exists')
         
     @user_has('snapshot_delete')
@@ -647,15 +645,13 @@ class Snapshots(Resource):
         """
         current_identity = import_user()
         container = Container.query.get(id)
-        client = lgw.lxd_client()
-        c = client.containers.get(container.name)
 
-        if c.name and (id in current_identity.containers or current_identity.admin):
+        if container.name and (id in current_identity.containers or current_identity.admin):
             try:
-                if name == c.snapshots.get(name).name:
+                resx = lgw.lxd_api_get('containers/' + container.name + '/snapshots/' + name)
+                if resx:
                     try:
-                        c.snapshots.get(name).delete()
-                        time.sleep(5)
+                        res = lgw.lxd_api_delete('containers/' + container.name + '/snapshots/' + name)
                         return {}, 204
                     except:
                         api.abort(code=500, message='Error deleting snapshot')
@@ -680,15 +676,13 @@ class SnapshotsRestore(Resource):
         """
         current_identity = import_user()
         container = Container.query.get(id)
-        client = lgw.lxd_client()
-        c = client.containers.get(container.name)
 
-        if c.name and (id in current_identity.containers or current_identity.admin):
+        if container.name and (id in current_identity.containers or current_identity.admin):
             try:
-                if name == c.snapshots.get(name).name:
+                resx = lgw.lxd_api_get('containers/' + container.name + '/snapshots/' + name)
+                if resx:
                     try:
-                        c.raw_put({'restore': name})
-                        time.sleep(20)
+                        res = lgw.lxd_api_put('containers/' + container.name, {'restore': name})
                         return {}, 204
                     except:
                         api.abort(code=500, message='Error restoring snapshot')
@@ -727,7 +721,7 @@ class LxcCheckConfig(Resource):
         :return data
         """
         conf = lgw.lxd_api_get_config().json()['metadata']
-        return {'data': conf}
+        return {'data': {'attributes': conf, 'type': 'checkconfig', 'id': 0 }}
 
         
 class CtsStats(Resource):
