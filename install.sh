@@ -5,13 +5,13 @@ printf '=============Setup the environment=============== \n'
 cd ..
 sudo apt-get update
 sudo apt-get install software-properties-common
-sudo add-apt-repository -y ppa:deadsnakes/ppa
+#sudo add-apt-repository -y ppa:deadsnakes/ppa
 sudo apt-get update
-printf '====== Set python3.7 as the default for python3 ======= \n'
-sudo apt-get install -y python3.7 python3-pip nginx python3.7-dev build-essential libssl-dev libffi-dev python3-setuptools
-sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.5 1
-sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.7 10
-sudo update-alternatives --config python3
+#printf '====== Set python3.7 as the default for python3 ======= \n'
+sudo apt-get install -y python3 python3-pip nginx python3-dev build-essential libssl-dev libffi-dev python3-setuptools
+#sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.5 1
+#sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.7 10
+#sudo update-alternatives --config python3
 pip3 install virtualenv
 sudo apt-get install redis-server
 }
@@ -64,8 +64,8 @@ location / {
 #ssl_certificate_key /etc/nginx/ssl/nginx.key;
 
 # Use this config for letsencrypt certificates
-#ssl_certificate /etc/letsencrypt/live/api.vpsadmin.skhosting.eu/fullchain.pem;
-#ssl_certificate_key /etc/letsencrypt/live/api.vpsadmin.skhosting.eu/privkey.pem;
+#ssl_certificate /etc/letsencrypt/live/api.example.com/fullchain.pem;
+#ssl_certificate_key /etc/letsencrypt/live/api.example.com/privkey.pem;
 
 # This section allow console connection
 #location /1.0/operations/ {
@@ -89,6 +89,7 @@ EOF
 sudo rm -rf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default
 sudo ln -s /etc/nginx/sites-available/lxd-api-gateway /etc/nginx/sites-enabled/
 sudo systemctl restart nginx
+sudo mkdir -p /var/www/acme
 }
 
 setupStartScript () {
