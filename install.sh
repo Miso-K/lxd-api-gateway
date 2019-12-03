@@ -33,7 +33,7 @@ sudo bash -c 'cat > /etc/nginx/sites-available/lxd-api-gateway <<EOF
 server {
 listen 80;
 
-#server_name api.example.com
+#server_name api.example.com;
 
 # Allow access to the ACME Challenge for Lets Encrypt
 location ^~ /.well-known/acme-challenge {
@@ -51,13 +51,13 @@ location / {
 
 # Use this config instead with https
 #location / {
-#    return 301 https://$server_name\$request_uri;
+#    return 301 https://\$server_name\$request_uri;
 #  }
 }
 
 #server {
 #listen 443 ssl;
-#server_name api.example.com
+#server_name api.example.com;
 
 # Use this config for self signed certificates
 #ssl_certificate /etc/nginx/ssl/nginx.crt;

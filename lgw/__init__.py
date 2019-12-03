@@ -175,8 +175,8 @@ def send_request(subject, message, useremail=None):
     config = configparser.ConfigParser()
     config.read('lxdconfig.conf')
 
-    enabled = config['smtp']['sender']
-    if enabled:
+    enabled = config['smtp']['enabled']
+    if enabled == 'True':
         sender = config['smtp']['sender']
         to = config['smtp']['recipient']
         cc = useremail
@@ -230,8 +230,8 @@ def send_otp_email(key, useremail=None):
     subject = 'Access key to ' + config['app']['production_name']
     message = 'Your otp access key is: ' + str(key)
 
-    enabled = config['smtp']['sender']
-    if enabled:
+    enabled = config['smtp']['enabled']
+    if enabled == 'True':
         sender = config['smtp']['sender']
         to = useremail
 
