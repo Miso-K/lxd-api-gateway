@@ -79,11 +79,11 @@ def cts_stats(containers):
         if memory:
             r = re.compile("([0-9]+)([a-zA-Z]+)")
             m = r.match(memory)
-            b = convert_bytes(m.group(1),m.group(2))
+            b = convert_bytes(m.group(1), m.group(2))
             memory_count_bytes += b
 
         if memory_count_bytes:
-            memory_count = memory_count_bytes / (1024 * 1024 * 1024)
+            memory_count = memory_count_bytes / (1000 * 1000 * 1000)
             memory_count = '{0:.2f}'.format(memory_count)
 
         '''disk usage'''
@@ -101,10 +101,11 @@ def cts_stats(containers):
         if disk:
             r = re.compile("([0-9]+)([a-zA-Z]+)")
             m = r.match(disk)
+            print(m.group(1), m.group(2))
             b = convert_bytes(m.group(1), m.group(2))
             disk_count_bytes += + b
         if disk_count_bytes:
-            disk_count = disk_count_bytes / (1024 * 1024 * 1024)
+            disk_count = disk_count_bytes / (1000 * 1000 * 1000)
             disk_count = '{0:.2f}'.format(disk_count)
 
         '''price'''
@@ -138,7 +139,8 @@ def cts_stats(containers):
         'price': {
             'price_count': price_count
         }
-    }    
+    }
+    print(cts)
 
     return cts    
 
@@ -153,13 +155,21 @@ def convert_bytes(size, type):
 
     bytes = 0
     if type == 'KB':
+        bytes = int(size) * 1000
+    if type == 'KiB':
         bytes = int(size) * 1024
     elif type == 'MB':
+        bytes = int(size) * 1000 * 1000
+    elif type == 'MiB':
         bytes = int(size) * 1024 * 1024
     elif type == 'GB':
+        bytes = int(size) * 1000 * 1000 * 1000
+    elif type == 'GiB':
         bytes = int(size) * 1024 * 1024 * 1024
     else: 
         bytes = size
+
+    print(bytes)
     return bytes
 
 
