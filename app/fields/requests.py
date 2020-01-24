@@ -15,11 +15,9 @@ requests_fields_attributes = api.model('RequestsFieldsAttributes', {
 requests_fields_with_relationships_put = api.model('RequestsFieldsWithRelationshipsPost', {
     'relationships': fields.Nested(api.model('RequestsRelationshipsPost', {
         'users': fields.Nested(api.model('RequestsDataPost', {
-            'data': fields.Nested(api.model('RequestsPostData', {
-                'type': fields.String(default='users'),
-                'id': fields.Integer
-            }), as_list=True)
-        })),
+            'id': fields.Integer,
+            'name': fields.String
+        }), as_list=True)
     }))
 })
 
@@ -41,10 +39,9 @@ _requests_fields_post = api.inherit('RequestsFieldsPost', requests_fields_with_r
     'attributes': fields.Nested(requests_fields_attributes_post),
 })
 
-_requests_fields_get = api.inherit('RequestsFieldsGet', requests_fields_with_relationships_put, {
+_requests_fields_get = api.inherit('RequestsFieldsGet', requests_fields_with_relationships_put, requests_fields_attributes, {
     'type': fields.String(default='requests'),
-    'id': fields.Integer,
-    'attributes': fields.Nested(requests_fields_attributes),
+    'id': fields.Integer
 })
 
 _requests_fields_put = api.inherit('RequestsFieldsPut', requests_fields_with_relationships_put, {
@@ -54,6 +51,6 @@ _requests_fields_put = api.inherit('RequestsFieldsPut', requests_fields_with_rel
 
 
 requests_fields_get = api.model('RequestsRootGet', { 'data': fields.Nested(_requests_fields_get) })
-requests_fields_get_many = api.model('RequestsRootGetMany', { 'data': fields.Nested(_requests_fields_get, as_list=True) })
+requests_fields_get_many = api.model('RequestsRootGetMany', {'data': fields.Nested(_requests_fields_get, as_list=True)})
 requests_fields_put = api.model('RequestsRootPut', { 'data': fields.Nested(_requests_fields_put) })
 requests_fields_post = api.model('RequestsRootPost', { 'data': fields.Nested(_requests_fields_post) })

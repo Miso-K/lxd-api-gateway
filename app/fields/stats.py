@@ -4,7 +4,8 @@ from flask_restplus import fields
 from app import api
 
 
-cts_stats_fields_attributes = api.model('CtsStats', {
+_cts_stats_fields_get = api.model('CtsStats', {
+    'type': fields.String(default='stats'),
     'containers': fields.Nested(api.model('CtsContainers', {
         'names': fields.List(fields.String),
         'count': fields.Integer,
@@ -26,12 +27,6 @@ cts_stats_fields_attributes = api.model('CtsStats', {
     'price': fields.Nested(api.model('CtsPrice', {
         'price_count': fields.Float
     }))
-})
-
-_cts_stats_fields_get = api.model('CtsStatsFieldsGet', {
-    'type': fields.String(default='stats'),
-    'attributes': fields.Nested(cts_stats_fields_attributes),
-    'id': fields.Integer(default=1)
 })
 
 

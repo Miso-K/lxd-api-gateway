@@ -264,24 +264,22 @@ class User(db.Model):
         _json = {
             'type': 'users',
             'id': self.id,
-            'attributes': {
-                'admin': self.admin,
-                'name': self.name,
-                'username': self.username,
-                'registered_on': self.registered_on,
-                'email': self.email,
-                'phone': self.phone,
-                'address': self.address,
-                'city': self.city,
-                'country': self.country,
-                'postal_code': self.postal_code,
-                'ico': self.ico,
-                'ic_dph': self.ic_dph,
-                'dic': self.dic,
-                'language': self.language,
-                'otp_enabled': self.has_totp_enabled(),
-                'otp_type': self.otp_type
-            }
+            'admin': self.admin,
+            'name': self.name,
+            'username': self.username,
+            'registered_on': self.registered_on,
+            'email': self.email,
+            'phone': self.phone,
+            'address': self.address,
+            'city': self.city,
+            'country': self.country,
+            'postal_code': self.postal_code,
+            'ico': self.ico,
+            'ic_dph': self.ic_dph,
+            'dic': self.dic,
+            'language': self.language,
+            'otp_enabled': self.has_totp_enabled(),
+            'otp_type': self.otp_type
         }
 
         if group == 'flat':
@@ -292,11 +290,11 @@ class User(db.Model):
         _json['relationships']['containers'] = {}
         _json['relationships']['requests'] = {}
 
-        _json['relationships']['groups']['data'] = [
+        _json['relationships']['groups'] = [
             group.__jsonapi__('flat') for group in self._groups]
-        _json['relationships']['containers']['data'] = [
+        _json['relationships']['containers'] = [
             container.__jsonapi__('flat') for container in self._containers]
-        _json['relationships']['requests']['data'] = [
+        _json['relationships']['requests'] = [
             req.__jsonapi__('flat') for req in self._requests]
 
         return _json
@@ -351,21 +349,19 @@ class Group(db.Model):
         _json = {
             'type': 'groups',
             'id': self.id,
-            'attributes': {
-                'name': self.name,
-            }
+            'name': self.name
         }
 
         if group == 'flat':
             return _json
 
         _json['relationships'] = {}
-        _json['relationships']['abilities'] = {}
-        _json['relationships']['users'] = {}
+        #_json['relationships']['abilities'] = {}
+        #_json['relationships']['users'] = {}
 
-        _json['relationships']['abilities']['data'] = [
+        _json['relationships']['abilities'] = [
             ability.__jsonapi__('flat') for ability in self._abilities]
-        _json['relationships']['users']['data'] = [
+        _json['relationships']['users'] = [
             user.__jsonapi__('flat') for user in self._users]
 
         return _json
@@ -405,18 +401,16 @@ class Ability(db.Model):
         _json = {
             'type': 'abilities',
             'id': self.id,
-            'attributes': {
-                'name': self.name
-            }
+            'name': self.name
         }
 
         if group == 'flat':
             return _json
 
         _json['relationships'] = {}
-        _json['relationships']['groups'] = {}
+        #_json['relationships']['groups'] = {}
 
-        _json['relationships']['groups']['data'] = [
+        _json['relationships']['groups'] = [
             group.__jsonapi__('flat') for group in self._groups]
 
         return _json
@@ -456,18 +450,16 @@ class Container(db.Model):
         _json = {
             'type': 'containers',
             'id': self.id,
-            'attributes': {
-                'name': self.name
-            }
+            'name': self.name
         }
 
         if group == 'flat':
             return _json
 
         _json['relationships'] = {}
-        _json['relationships']['users'] = {}
+        #_json['relationships']['users'] = {}
 
-        _json['relationships']['users']['data'] = [
+        _json['relationships']['users'] = [
             user.__jsonapi__('flat') for user in self._users]
 
         return _json
@@ -523,23 +515,21 @@ class Request(db.Model):
         _json = {
             'type': 'requests',
             'id': self.id,
-            'attributes': {
-                'action': self.action,
-                'message': self.message,
-                'meta_data': self.meta_data,
-                'status': self.status,
-                'created_on': self.created_on,
-                'changed_on': self.changed_on
-            }
+            'action': self.action,
+            'message': self.message,
+            'meta_data': self.meta_data,
+            'status': self.status,
+            'created_on': self.created_on,
+            'changed_on': self.changed_on
         }
 
         if group == 'flat':
             return _json
 
         _json['relationships'] = {}
-        _json['relationships']['users'] = {}
+        #_json['relationships']['users'] = {}
 
-        _json['relationships']['users']['data'] = [
+        _json['relationships']['users'] = [
             user.__jsonapi__('flat') for user in self._users]
 
         return _json

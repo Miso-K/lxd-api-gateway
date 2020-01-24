@@ -35,13 +35,21 @@ nslxc.add_resource(ContainersExec, '/containers/<int:id>/exec')
 nslxc.add_resource(ContainersState, '/containers/<int:id>/state')
 
 # Special and config routes
+nslxc.add_resource(Operations, '/operations/<string:id>')
 nslgw.add_resource(CtsStats, '/stats')
 nslgw.add_resource(LXDConfig, '/lxdconfig')
 nslgw.add_resource(LXDCerts, '/lxdcerts')
 nslxc.add_resource(LxcHostResources, '/resources')
 nslxc.add_resource(LxcCheckConfig, '/checkconfig')
 
-# Snapshots routes - not tested for production
+# Snapshots routes
 nslxc.add_resource(SnapshotsList, '/containers/<int:id>/snapshots')
 nslxc.add_resource(Snapshots, '/containers/<int:id>/snapshots/<string:name>')
 nslxc.add_resource(SnapshotsRestore, '/containers/<int:id>/snapshots/<string:name>/restore')
+
+# Images routes
+nslxc.add_resource(ImagesList, '/images')
+nslxc.add_resource(Images, '/images/<string:fingerprint>')
+nslxc.add_resource(ImagesAliasesList, '/images/aliases')
+nslxc.add_resource(ImagesAliases, '/images/aliases/<path:alias>')
+nslxc.add_resource(RemoteImagesList, '/images/remote')

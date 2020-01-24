@@ -27,16 +27,6 @@ _lxdconfig_fields_get = api.model('LXDConfigFieldsGet', {
 lxdconfig_fields_get = api.model('LXDConfigGet', {'data': fields.Nested(_lxdconfig_fields_get)})
 
 lxdconfig_fields_post = api.model('LXDConfigPost', {
-    'endpoint': fields.String(required=True),
-    'cert_crt': fields.String(required=True),
-    'cert_key': fields.String(required=True),
-    'verify': fields.String(required=True, default='False'),
-    'sender': fields.String(required=True),
-    'recipient': fields.String(required=True),
-    'server': fields.String(required=True),
-    'port': fields.String(required=True),
-    'login': fields.String(required=True),
-    'password': fields.String(required=True),
-    'production_name': fields.String(required=True)
+    'data': fields.Raw
     }
 )

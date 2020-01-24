@@ -10,18 +10,17 @@ abilities_fields_attributes = api.model('AbilitiesFieldsAttributes', {
 abilities_fields_with_relationships_put = api.model('AbilitiesFieldsWithRelationshipsPost', {
     'relationships': fields.Nested(api.model('AbilitiesRelationshipsPost', {
         'groups': fields.Nested(api.model('AbilitiesDataPost', {
-            'data': fields.Nested(api.model('AbilitiesPostData', {
-                'type': fields.String,
-                'id': fields.Integer
-            }), as_list=True)
-        })),
+            'id': fields.Integer,
+            'name': fields.String
+        }), as_list=True)
     }))
 })
 
 _abilities_fields_get = api.inherit('AbilitiesFieldsGet', abilities_fields_with_relationships_put, {
     'type': fields.String(default='abilities'),
     'id': fields.Integer,
-    'attributes': fields.Nested(abilities_fields_attributes),
+    #'attributes': fields.Nested(abilities_fields_attributes),
+    'name': fields.String
 })
 
 _abilities_fields_put = api.inherit('AbilitiesFieldsPut', abilities_fields_with_relationships_put, {

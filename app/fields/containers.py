@@ -89,11 +89,9 @@ containers_fields_attributes_put = api.model('ContainersFieldsAttributesPut', {
 containers_fields_with_relationships_post_put = api.model('ContainersFieldsWithRelationshipsPost', {
     'relationships': fields.Nested(api.model('ContainersRelationshipsPost', {
         'users': fields.Nested(api.model('ContainersDataPost', {
-            'data': fields.Nested(api.model('ContainersPostData', {
-                'type': fields.String(default='users'),
-                'id': fields.Integer
-            }), as_list=True)
-        })),
+            'type': fields.String(default='users'),
+            'id': fields.Integer
+        }), as_list=True)
     }))
 })
 
@@ -101,7 +99,27 @@ _containers_fields_get = api.inherit('ContainersFieldsGet', containers_fields_wi
     'type': fields.String(default='containers'),
     'id': fields.Integer,
     #'attributes': fields.Nested(containers_fields_attributes),
-    'attributes': fields.Raw()
+    'attributes': fields.Raw(),
+    'architecture': fields.Raw(),
+    'config': fields.Raw(),
+    'devices': fields.Raw(),
+    'ephemeral': fields.Raw(),
+    'profiles': fields.Raw(),
+    'stateful': fields.Raw(),
+    'description': fields.Raw(),
+    'created_at': fields.Raw(),
+    'expanded_config': fields.Raw(),
+    'expanded_devices': fields.Raw(),
+    'name': fields.Raw(),
+    'status': fields.Raw(),
+    'status_code': fields.Raw(),
+    'last_used_at': fields.Raw(),
+    'location': fields.Raw(),
+    'type': fields.Raw(),
+    'state': fields.Raw(),
+    'pid': fields.Raw(),
+    'processes': fields.Raw(),
+    'cpu': fields.Raw()
 })
 
 _containers_fields_post = api.inherit('ContainersFieldsPost', containers_fields_with_relationships_post_put, {
@@ -119,3 +137,5 @@ containers_fields_get = api.model('ContainersRootGet', { 'data': fields.Nested(_
 containers_fields_get_many = api.model('ContainersRootGetMany', { 'data': fields.Nested(_containers_fields_get, as_list=True) })
 containers_fields_post = api.model('ContainersRootPost', { 'data': fields.Nested(_containers_fields_post) })
 containers_fields_put = api.model('ContainersRootPut', { 'data': fields.Nested(_containers_fields_put) })
+
+containers_fields_get_many2 = api.model('ContainersRootGetMany', { 'data': fields.Raw })

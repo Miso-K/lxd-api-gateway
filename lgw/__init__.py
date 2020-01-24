@@ -55,7 +55,7 @@ def cts_stats(containers):
 
     for ct in containers:
         ec = lxd_api_get('containers/'+ct).json()['metadata']
-        sc =lxd_api_get('containers/' + ct + '/state').json()['metadata']
+        #sc =lxd_api_get('containers/' + ct + '/state').json()['metadata']
 
         if ec['status'] == "Running":
             count_running += 1
@@ -101,7 +101,7 @@ def cts_stats(containers):
         if disk:
             r = re.compile("([0-9]+)([a-zA-Z]+)")
             m = r.match(disk)
-            print(m.group(1), m.group(2))
+            #print(m.group(1), m.group(2))
             b = convert_bytes(m.group(1), m.group(2))
             disk_count_bytes += + b
         if disk_count_bytes:
@@ -140,7 +140,7 @@ def cts_stats(containers):
             'price_count': price_count
         }
     }
-    print(cts)
+    #print(cts)
 
     return cts    
 
@@ -169,7 +169,7 @@ def convert_bytes(size, type):
     else: 
         bytes = size
 
-    print(bytes)
+    #print(bytes)
     return bytes
 
 
@@ -189,7 +189,10 @@ def send_request(subject, message, useremail=None):
     if enabled == 'True':
         sender = config['smtp']['sender']
         to = config['smtp']['recipient']
-        cc = useremail
+        if config['smtp']['notify_user'] == 'True':
+            cc = useremail
+        else:
+            cc = None
 
         # print("Sending email" + message + " subject: " + subject)
 
@@ -280,7 +283,7 @@ def lxd_api_get(endpoint):
     :return: response:
     """
 
-    r = requests.get(get_config()['endpoint'] + '/1.0/' + endpoint + '', verify=get_config()['verify'], cert=get_config()['cert'], timeout=10)
+    r = requests.get(get_config()['endpoint'] + '/1.0/' + endpoint + '', verify=get_config()['verify'], cert=get_config()['cert'], timeout=100)
     #print(r.text)
     return r
 
@@ -343,5 +346,15 @@ def lxd_api_get_config():
     """
 
     r = requests.get(get_config()['endpoint'] + '/1.0', verify=get_config()['verify'], cert=get_config()['cert'])
+    #print(r.text)
+    return r
+
+def lxd_remote_get():
+    """
+    Get function for get LXD API to remote
+    :return: response:
+    """
+
+    r = requests.get('https://uk.images.linuxcontainers.org' + '/1.0/images/aliases?recursion=1', timeout=10)
     #print(r.text)
     return r

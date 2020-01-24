@@ -183,52 +183,50 @@ class UsersList(Resource):
         """
         current_identity = import_user()
         data = request.get_json()['data']
-        if User.query.filter_by(username=data['attributes']['username']).first():
+        if User.query.filter_by(username=data['username']).first():
             api.abort(code=409, message='User already exists')
 
         user = User()
 
-        user.username = data['attributes']['username']
-        user.name = data['attributes']['name']
-        user.hash_password(data['attributes']['password'])
+        user.username = data['username']
+        user.name = data['name']
+        user.hash_password(data['password'])
 
-        if 'admin' in data['attributes'] and current_identity.admin:
-            user.admin = data['attributes']['admin']
-        if 'email' in data['attributes']:
-            user.email = data['attributes']['email']
-        if 'phone' in data['attributes']:
-            user.phone = data['attributes']['phone']
-        if 'address' in data['attributes']:
-            user.address = data['attributes']['address']
-        if 'city' in data['attributes']:
-            user.city = data['attributes']['city']
-        if 'country' in data['attributes']:
-            user.country = data['attributes']['country']
-        if 'postal_code' in data['attributes']:
-            user.postal_code = data['attributes']['postal_code']
-        if 'ico' in data['attributes']:
-            user.ico = data['attributes']['ico']
-        if 'ic_dph' in data['attributes']:
-            user.ic_dph = data['attributes']['ic_dph']
-        if 'dic' in data['attributes']:
-            user.dic = data['attributes']['dic']
-        if 'language' in data['attributes']:
-            user.language = data['attributes']['language']
-        if 'otp_type' in data['attributes']:
-            if data['attributes']['otp_type'] == 'none':
+        if 'admin' in data and current_identity.admin:
+            user.admin = data['admin']
+        if 'email' in data:
+            user.email = data['email']
+        if 'phone' in data:
+            user.phone = data['phone']
+        if 'address' in data:
+            user.address = data['address']
+        if 'city' in data:
+            user.city = data['city']
+        if 'country' in data:
+            user.country = data['country']
+        if 'postal_code' in data:
+            user.postal_code = data['postal_code']
+        if 'ico' in data:
+            user.ico = data['ico']
+        if 'ic_dph' in data:
+            user.ic_dph = data['ic_dph']
+        if 'dic' in data:
+            user.dic = data['dic']
+        if 'language' in data:
+            user.language = data['language']
+        if 'otp_type' in data:
+            if data['otp_type'] == 'none':
                 user.otp_type = None
             else:
-                user.otp_type = data['attributes']['otp_type']
+                user.otp_type = data['otp_type']
 
         try:
-            user.groups = list(id['id'] for id in data[
-                               'relationships']['groups']['data'])
+            user.groups = list(id['id'] for id in data['relationships']['groups'])
         except KeyError:
             pass
 
         try:
-            user.containers = list(id['id'] for id in data[
-                                   'relationships']['containers']['data'])
+            user.containers = list(id['id'] for id in data['relationships']['containers'])
         except KeyError:
             pass
 
@@ -270,43 +268,43 @@ class Users(Resource):
 
         data = request.get_json()['data']
 
-        if 'admin' in data['attributes'] and current_identity.admin:
-            user.admin = data['attributes']['admin']
-        if 'name' in data['attributes']:
-            user.name = data['attributes']['name']
-        if 'email' in data['attributes']:
-            user.email = data['attributes']['email']
-        if 'phone' in data['attributes']:
-            user.phone = data['attributes']['phone']
-        if 'address' in data['attributes']:
-            user.address = data['attributes']['address']
-        if 'city' in data['attributes']:
-            user.city = data['attributes']['city']
-        if 'country' in data['attributes']:
-            user.country = data['attributes']['country']
-        if 'postal_code' in data['attributes']:
-            user.postal_code = data['attributes']['postal_code']
-        if 'ico' in data['attributes']:
-            user.ico = data['attributes']['ico']
-        if 'ic_dph' in data['attributes']:
-            user.ic_dph = data['attributes']['ic_dph']
-        if 'dic' in data['attributes']:
-            user.dic = data['attributes']['dic']
-        if 'language' in data['attributes']:
-            user.language = data['attributes']['language']
+        if 'admin' in data and current_identity.admin:
+            user.admin = data['admin']
+        if 'name' in data:
+            user.name = data['name']
+        if 'email' in data:
+            user.email = data['email']
+        if 'phone' in data:
+            user.phone = data['phone']
+        if 'address' in data:
+            user.address = data['address']
+        if 'city' in data:
+            user.city = data['city']
+        if 'country' in data:
+            user.country = data['country']
+        if 'postal_code' in data:
+            user.postal_code = data['postal_code']
+        if 'ico' in data:
+            user.ico = data['ico']
+        if 'ic_dph' in data:
+            user.ic_dph = data['ic_dph']
+        if 'dic' in data:
+            user.dic = data['dic']
+        if 'language' in data:
+            user.language = data['language']
 
-        if 'password' in data['attributes'] and current_identity.admin:
-            user.hash_password(data['attributes']['password'])
+        if 'password' in data and current_identity.admin:
+            user.hash_password(data['password'])
 
         try:
             user.groups = list(id['id'] for id in data[
-                               'relationships']['groups']['data'])
+                               'relationships']['groups'])
         except KeyError:
             pass
 
         try:
             user.containers = list(id['id'] for id in data[
-                                   'relationships']['containers']['data'])
+                                   'relationships']['containers'])
         except KeyError:
             pass
 
@@ -334,6 +332,7 @@ class Users(Resource):
 class Me(Resource):
     decorators = [jwt_required, otp_confirmed]
 
+    @user_has('me_infos')
     @api.marshal_with(users_fields_get)
     def get(self):
         """
@@ -343,7 +342,7 @@ class Me(Resource):
         current_identity = import_user()
         return {'data': current_identity.__jsonapi__()}
 
-    @user_has('me_edit')
+    @user_has('me_update')
     #@api.expect(users_fields_put, validate=True)
     @api.marshal_with(users_fields_get)
     def put(self):
@@ -355,41 +354,41 @@ class Me(Resource):
 
         data = request.get_json()['data']
 
-        if 'name' in data['attributes']:
-            user.name = data['attributes']['name']
-        if 'email' in data['attributes']:
-            user.email = data['attributes']['email']
-        if 'phone' in data['attributes']:
-            user.phone = data['attributes']['phone']
-        if 'address' in data['attributes']:
-            user.address = data['attributes']['address']
-        if 'city' in data['attributes']:
-            user.city = data['attributes']['city']
-        if 'country' in data['attributes']:
-            user.country = data['attributes']['country']
-        if 'postal_code' in data['attributes']:
-            user.postal_code = data['attributes']['postal_code']
-        if 'ico' in data['attributes']:
-            user.ico = data['attributes']['ico']
-        if 'ic_dph' in data['attributes']:
-            user.ic_dph = data['attributes']['ic_dph']
-        if 'dic' in data['attributes']:
-            user.dic = data['attributes']['dic']
-        if 'langugage' in data['attributes']:
-            user.language = data['attributes']['language']
-        if 'otp_type' in data['attributes']:
-            if data['attributes']['otp_type'] == 'none':
+        if 'name' in data:
+            user.name = data['name']
+        if 'email' in data:
+            user.email = data['email']
+        if 'phone' in data:
+            user.phone = data['phone']
+        if 'address' in data:
+            user.address = data['address']
+        if 'city' in data:
+            user.city = data['city']
+        if 'country' in data:
+            user.country = data['country']
+        if 'postal_code' in data:
+            user.postal_code = data['postal_code']
+        if 'ico' in data:
+            user.ico = data['ico']
+        if 'ic_dph' in data:
+            user.ic_dph = data['ic_dph']
+        if 'dic' in data:
+            user.dic = data['dic']
+        if 'langugage' in data:
+            user.language = data['language']
+        if 'otp_type' in data:
+            if data['otp_type'] == 'none':
                 user.otp_type = None
             else:
-                user.otp_type = data['attributes']['otp_type']
+                user.otp_type = data['otp_type']
 
-        if 'cur_password' in data['attributes']:
-            cur_password = data['attributes']['cur_password']
+        if 'cur_password' in data:
+            cur_password = data['cur_password']
             #print('before verify')
             #print(data['attributes'])
-            if 'new_password' in data['attributes'] and user.verify_password(cur_password):
-                if data['attributes']['new_password'] == data['attributes']['confirm_password']:
-                    user.hash_password(data['attributes']['new_password'])
+            if 'new_password' in data and user.verify_password(cur_password):
+                if data['new_password'] == data['confirm_password']:
+                    user.hash_password(data['new_password'])
             else:
                 api.abort(code=401, message='Incorrect user or password')
 
@@ -414,10 +413,11 @@ class Me(Resource):
     #
     #    return {}, 204
 
+
 class MeOtp(Resource):
     decorators = [jwt_required, otp_confirmed]
 
-    @user_has('me_otp')
+    @user_has('me_otp_create')
     def post(self):
         """
         Generate totp secret
@@ -441,8 +441,8 @@ class MeOtp(Resource):
             api.abort(code=500, message='User has otp secret set')
 
         db.session.commit()
-        json_ret = {'otp_secret': user.otp_secret, 'otp_uri': user.get_totp_uri()}
-        return {'data': {'type': 'otp', 'id': '0', 'attributes': json_ret}}, 201
+        json_ret = {'type': 'otp', 'otp_secret': user.otp_secret, 'otp_uri': user.get_totp_uri()}
+        return {'data': json_ret}, 201
 
 
 class GroupsList(Resource):
@@ -474,17 +474,17 @@ class GroupsList(Resource):
         """
         data = request.get_json()['data']
 
-        group = Group(name=data['attributes']['name'])
+        group = Group(name=data['name'])
 
         try:
             group.abilities = list(id['id'] for id in data[
-                                   'relationships']['abilities']['data'])
+                                   'relationships']['abilities'])
         except KeyError:
             pass
 
         try:
             group.users = list(id['id'] for id in data[
-                'relationships']['users']['data'])
+                'relationships']['users'])
         except KeyError:
             pass
 
@@ -529,18 +529,18 @@ class Groups(Resource):
 
         data = request.get_json()['data']
 
-        if 'name' in data['attributes']:
-            group.name = data['attributes']['name']
+        if 'name' in data:
+            group.name = data['name']
 
         try:
             group.abilities = list(id['id'] for id in data[
-                                   'relationships']['abilities']['data'])
+                                   'relationships']['abilities'])
         except KeyError:
             pass
 
         try:
             group.users = list(id['id'] for id in data[
-                'relationships']['users']['data'])
+                'relationships']['users'])
         except KeyError:
             pass
 
@@ -611,9 +611,9 @@ class Abilities(Resource):
         data = request.get_json()['data']
 
         try:
-            if len(data['relationships']['groups']['data']) >= 0:
+            if len(data['relationships']['groups']) >= 0:
                 ability.groups = list(id['id'] for id in data[
-                                      'relationships']['groups']['data'])
+                                      'relationships']['groups'])
                 db.session.commit()
         except KeyError:
             pass
@@ -628,6 +628,7 @@ class Abilities(Resource):
 class RequestsList(Resource):
     decorators = [jwt_required, otp_confirmed]
 
+    @user_has('requests_infos_all')
     @api.marshal_with(requests_fields_get_many)
     def get(self):
         """
@@ -643,7 +644,9 @@ class RequestsList(Resource):
                 requests_list.append(req.__jsonapi__())
 
         return {'data': requests_list}
+        #return requests_list
 
+    @user_has('requests_create')
     #@api.expect(requests_fields_post, validate=True)
     @api.marshal_with(requests_fields_get)
     def post(self):
@@ -651,16 +654,17 @@ class RequestsList(Resource):
         Create request
         """
         data = request.get_json()['data']
+        print(data)
 
-        req = Request(message=data['attributes']['message'])
-        req.action = data['attributes']['action']
-        req.status = data['attributes']['status']
-        req.meta_data = data['attributes']['meta_data']
+        req = Request(message=data['message'])
+        req.action = data['action']
+        req.status = data['status']
+        req.meta_data = data['meta_data']
         #req.users = list('1',)
         if 'relationships' in data:
             try:
                 req.users = list(id['id'] for id in data[
-                    'relationships']['users']['data'])
+                    'relationships']['users'])
             except KeyError:
                 pass
         else:
@@ -670,17 +674,23 @@ class RequestsList(Resource):
         db.session.add(req)
         db.session.commit()
 
-        mail_message = 'User:' + str(
-            req.__jsonapi__()['relationships']['users']['data'][0]['attributes']['username']) + ' Data: ' + str(
-            req.__jsonapi__()['attributes'])
-        lgw.send_request(data['attributes']['message'], mail_message)
+        username = req.__jsonapi__()['relationships']['users'][0]['username']
+        usermail = req.__jsonapi__()['relationships']['users'][0]['email']
+        atr = req.__jsonapi__()
 
+        mail_message = 'Username:' + username + \
+                       '/r/nAction: ' + str(atr['action']) + \
+                       '/r/nStatus: ' + str(atr['status']) + \
+                       '/r/nInfo: ' + str(atr['meta_data'])
+
+        lgw.send_request(data['message'], mail_message, usermail)
         return {'data': req.__jsonapi__()}, 201
 
 
 class Requests(Resource):
     decorators = [jwt_required, otp_confirmed]
 
+    @user_has('requests_infos')
     @api.marshal_with(requests_fields_get)
     def get(self, id):
         """
@@ -692,7 +702,9 @@ class Requests(Resource):
             api.abort(code=404, message='Request not found')
 
         return {'data': req.__jsonapi__()}
+        #return req.__jsonapi__()
 
+    @user_has('requests_update')
     @api.expect(requests_fields_put, validate=True)
     @api.marshal_with(requests_fields_get)
     def put(self, id):
@@ -706,27 +718,44 @@ class Requests(Resource):
 
         data = request.get_json()['data']
 
-        if 'message' in data['attributes']:
-            req.message = data['attributes']['message']
-        if 'status' in data['attributes']:
-            req.status = data['attributes']['status']
+        if 'message' in data:
+            req.message = data['message']
+        if 'status' in data:
+            req.status = data['status']
         req.changed_on = datetime.datetime.now()
 
         try:
             req.users = list(id['id'] for id in data[
-                'relationships']['users']['data'])
+                'relationships']['users'])
         except KeyError:
             pass
 
         if len(data) > 0:
             db.session.commit()
 
-        mail_message = 'User:' + str(
-            req.__jsonapi__()['relationships']['users']['data'][0]['attributes']['username']) + ' Data: ' + str(
-            req.__jsonapi__()['attributes'])
-        lgw.send_request(data['attributes']['message'], mail_message)
+        username = req.__jsonapi__()['relationships']['users'][0]['username']
+        usermail = req.__jsonapi__()['relationships']['users'][0]['email']
+
+        mail_message = 'User:' + username + '/r/nData: ' + str(
+            req.__jsonapi__())
+        lgw.send_request(data['message'], mail_message, usermail)
 
         return {'data': req.__jsonapi__()}
+
+    @user_has('requests_delete')
+    def delete(self, id):
+        """
+        Delete request
+        """
+        req = Request.query.get(id)
+
+        if not req:
+            api.abort(code=404, message='Request not found')
+
+        db.session.delete(req)
+        db.session.commit()
+
+        return {}, 204
 
 
 ##################
@@ -735,7 +764,7 @@ class Requests(Resource):
 class LXDConfig(Resource):
     decorators = [jwt_required, otp_confirmed]
 
-    #@user_has('lxd_config')
+    @user_has('config_infos')
     #@api.marshal_with(lxdconfig_fields_get)
     def get(self):
         """
@@ -750,92 +779,48 @@ class LXDConfig(Resource):
             Config = configparser.ConfigParser()
             try:
                 Config.read('lxdconfig.conf')
-                data['endpoint'] = Config['remote']['endpoint']
-                data['cert_crt'] = Config['remote']['cert_crt']
-                data['cert_key'] = Config['remote']['cert_key']
-                data['verify'] = Config['remote']['verify']
+                data = {}
+                for each_section in Config.sections():
+                    data[each_section] = {}
+                    for (each_key, each_val) in Config.items(each_section):
+                        data[each_section][each_key] = each_val
 
-                if 'smtp' in Config:
-                    data['smtp'] = {}
-                    data['smtp']['enabled'] = Config['smtp']['enabled']
-                    data['smtp']['sender'] = Config['smtp']['sender']
-                    data['smtp']['recipient'] = Config['smtp']['recipient']
-                    data['smtp']['server'] = Config['smtp']['server']
-                    data['smtp']['port'] = Config['smtp']['port']
-                    data['smtp']['login'] = Config['smtp']['login']
-                    data['smtp']['password'] = Config['smtp']['password']
-
-                if 'price' in Config:
-                    print(Config['price']['enabled'])
-                    data['price'] = {}
-                    data['price']['periodes'] = {}
-                    data['price']['enabled'] = Config['price']['enabled']
-                    data['price']['cpu'] = Config['price']['cpu']
-                    data['price']['memory'] = Config['price']['memory']
-                    data['price']['disk'] = Config['price']['disk']
-                    data['price']['periodes']['month'] = Config['price']['periodes.month']
-                    data['price']['periodes']['months'] = Config['price']['periodes.months']
-                    data['price']['periodes']['halfyear'] = Config['price']['periodes.halfyear']
-                    data['price']['periodes']['year'] = Config['price']['periodes.year']
-                    data['price']['periodes']['years'] = Config['price']['periodes.years']
-                #except:
-                    #data['price'] = None
-                #    print(data)
-
-                if 'storage' in Config:
-                    data['storage'] = {}
-                    data['storage']['enabled'] = Config['storage']['enabled']
-                    data['storage']['pool_name'] = Config['storage']['pool_name']
-
-                    #data['storage'] = None
-
-                data['production_name'] = Config['app']['production_name']
             except Exception as e:
                 api.abort(code=404, message='Error when read config file.')
 
-            return {'data': {'attributes': data, 'type': 'lxdconfig', 'id': '1'}}
+            #return {'data': {'attributes': data, 'type': 'lxdconfig', 'id': '1'}}
+            return {'data': data}
 
         else:
             Config = configparser.ConfigParser()
             try:
                 Config.read('lxdconfig.conf')
+                data = {}
+                for each_section in Config.sections():
+                    data[each_section] = {}
+                    if each_section == 'remote':
+                        continue
+                    if each_section == 'smtp':
+                        continue
+                    for (each_key, each_val) in Config.items(each_section):
+                        data[each_section][each_key] = each_val
+
                 if 'smtp' in Config:
                     data['smtp'] = {}
                     data['smtp']['enabled'] = Config['smtp']['enabled']
 
-                if 'price' in Config:
-                    print(Config['price']['enabled'])
-                    data['price'] = {}
-                    data['price']['periodes'] = {}
-                    data['price']['enabled'] = Config['price']['enabled']
-                    data['price']['cpu'] = Config['price']['cpu']
-                    data['price']['memory'] = Config['price']['memory']
-                    data['price']['disk'] = Config['price']['disk']
-                    data['price']['periodes']['month'] = Config['price']['periodes.month']
-                    data['price']['periodes']['months'] = Config['price']['periodes.months']
-                    data['price']['periodes']['halfyear'] = Config['price']['periodes.halfyear']
-                    data['price']['periodes']['year'] = Config['price']['periodes.year']
-                    data['price']['periodes']['years'] = Config['price']['periodes.years']
-
-                if 'storage' in Config:
-                    data['storage'] = {}
-                    data['storage']['enabled'] = Config['storage']['enabled']
-                    data['storage']['pool_name'] = Config['storage']['pool_name']
-
-                    # data['storage'] = None
-
-                data['production_name'] = Config['app']['production_name']
             except Exception as e:
                 api.abort(code=404, message='Error when read config file.')
 
-            return {'data': {'attributes': data, 'type': 'lxdconfig', 'id': '1'}}
+            #return {'data': {'attributes': data, 'type': 'lxdconfig', 'id': '1'}}
+            return {'data': data}
 
-        api.abort(code=404, message='You has not admin privileges')
+        api.abort(code=404, message='You has not access')
 
 
-    @user_has('lxd_config')
+    @user_has('config_update')
     @api.marshal_with(lxdconfig_fields_get)
-    #@api.expect(lxdconfig_fields_post, validate=True)
+    @api.expect(lxdconfig_fields_post)
     def post(self):
         """
         Set LXD config
@@ -844,49 +829,56 @@ class LXDConfig(Resource):
         current_identity = import_user()
 
         data = request.get_json()
-        #print(data)
+        print(data)
 
-        if current_identity.admin:
+        def updateconf(Config, section, option):
+            if not Config.has_section(section):
+                Config.add_section(section)
+
+            if section in data:
+                if option in data[section]:
+                    Config.set(section, option, str(data[section][option]))
+
+        if current_identity.admin and data:
 
             Config = configparser.ConfigParser()
+            try:
+                Config.read('lxdconfig.conf')
+
+                updateconf(Config, 'remote', 'endpoint')
+                updateconf(Config, 'remote', 'cert_crt')
+                updateconf(Config, 'remote', 'cert_key')
+                updateconf(Config, 'remote', 'verify')
+
+                updateconf(Config, 'smtp', 'enabled')
+                updateconf(Config, 'smtp', 'notify_user')
+                updateconf(Config, 'smtp', 'sender')
+                updateconf(Config, 'smtp', 'recipient')
+                updateconf(Config, 'smtp', 'server')
+                updateconf(Config, 'smtp', 'port')
+                updateconf(Config, 'smtp', 'login')
+                updateconf(Config, 'smtp', 'password')
+
+                updateconf(Config, 'app', 'production_name')
+
+                updateconf(Config, 'price', 'enabled')
+                updateconf(Config, 'price', 'cpu')
+                updateconf(Config, 'price', 'memory')
+                updateconf(Config, 'price', 'disk')
+                updateconf(Config, 'price', 'discount_month')
+                updateconf(Config, 'price', 'discount_months')
+                updateconf(Config, 'price', 'discount_halfyear')
+                updateconf(Config, 'price', 'discount_year')
+                updateconf(Config, 'price', 'discount_years')
+
+                updateconf(Config, 'storage', 'enabled')
+                updateconf(Config, 'storage', 'pool_name')
+
+            except Exception as e:
+                print('exception', e)
+                return {}, 500
 
             cfgfile = open('lxdconfig.conf', 'w')
-            Config.add_section('local')
-            Config.add_section('remote')
-            Config.set('remote', 'endpoint', data['endpoint'])
-            Config.set('remote', 'cert_crt', data['cert_crt'])
-            Config.set('remote', 'cert_key', data['cert_key'])
-            Config.set('remote', 'verify', data['verify'])
-
-            Config.add_section('smtp')
-            Config.set('smtp', 'enabled', str(data['smtp']['enabled']))
-            Config.set('smtp', 'sender', data['smtp']['sender'])
-            Config.set('smtp', 'recipient', data['smtp']['recipient'])
-            Config.set('smtp', 'server', data['smtp']['server'])
-            Config.set('smtp', 'port', data['smtp']['port'])
-            Config.set('smtp', 'login', data['smtp']['login'])
-            Config.set('smtp', 'password', data['smtp']['password'])
-
-            Config.add_section('app')
-            Config.set('app', 'production_name', data['production_name'])
-
-            Config.add_section('price')
-            #if data['price']['enabled']:
-            Config.set('price', 'enabled', str(data['price']['enabled']))
-            Config.set('price', 'cpu', data['price']['cpu'])
-            Config.set('price', 'memory', data['price']['memory'])
-            Config.set('price', 'disk', data['price']['disk'])
-            Config.set('price', 'periodes.month', data['price']['periodes']['month'])
-            Config.set('price', 'periodes.months', data['price']['periodes']['months'])
-            Config.set('price', 'periodes.halfyear', data['price']['periodes']['halfyear'])
-            Config.set('price', 'periodes.year', data['price']['periodes']['year'])
-            Config.set('price', 'periodes.years', data['price']['periodes']['years'])
-
-            Config.add_section('storage')
-            #if data['storage']['enabled']:
-            Config.set('storage', 'enabled', str(data['storage']['enabled']))
-            Config.set('storage', 'pool_name', data['storage']['pool_name'])
-
             Config.write(cfgfile)
             cfgfile.close()
 
@@ -895,7 +887,8 @@ class LXDConfig(Resource):
 
 class LXDCerts(Resource):
     decorators = [jwt_required, otp_confirmed]
-    @user_has('lxd_certs')
+
+    @user_has('lxd_certs_create')
     @api.marshal_with(lxdcerts_fields_get)
     @api.expect(lxdcerts_fields_post, validate=True)
     def post(self):
