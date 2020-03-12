@@ -6,7 +6,7 @@ Flask-JWT-Extended==3.18.0
 Flask-SQLAlchemy==2.2
 flask-restplus==0.12.1
 passlib==1.7.1
-psutil==5.2.2
+psutil==5.6.6
 onetimepass==1.0.1
 redis==3.2.1
 requests
