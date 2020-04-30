@@ -165,7 +165,7 @@ class UsersList(Resource):
         """
         Get users list
         """
-        populate_containers_table()
+        populate_instances_table()
         users = User.query.all()
         users_list = []
 
@@ -226,7 +226,7 @@ class UsersList(Resource):
             pass
 
         try:
-            user.containers = list(id['id'] for id in data['relationships']['containers'])
+            user.instances = list(id['id'] for id in data['relationships']['instances'])
         except KeyError:
             pass
 
@@ -245,7 +245,7 @@ class Users(Resource):
         """
         Get user
         """
-        populate_containers_table()
+        populate_instances_table()
         user = User.query.get(id)
 
         if not user:
@@ -303,8 +303,8 @@ class Users(Resource):
             pass
 
         try:
-            user.containers = list(id['id'] for id in data[
-                                   'relationships']['containers'])
+            user.instances = list(id['id'] for id in data[
+                                   'relationships']['instances'])
         except KeyError:
             pass
 
@@ -338,7 +338,7 @@ class Me(Resource):
         """
         Get me
         """
-        populate_containers_table()
+        populate_instances_table()
         current_identity = import_user()
         return {'data': current_identity.__jsonapi__()}
 
@@ -392,7 +392,7 @@ class Me(Resource):
             else:
                 api.abort(code=401, message='Incorrect user or password')
 
-        # Not secure for user to change his group or container
+        # Not secure for user to change his group or instance
 
         if len(data) > 0:
             db.session.commit()
@@ -829,7 +829,7 @@ class LXDConfig(Resource):
         current_identity = import_user()
 
         data = request.get_json()
-        print(data)
+        #print(data)
 
         def updateconf(Config, section, option):
             if not Config.has_section(section):

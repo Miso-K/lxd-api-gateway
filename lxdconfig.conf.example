@@ -1,5 +1,3 @@
-[local]
-
 [remote]
 endpoint = https://127.0.0.1:8443
 cert_crt = lxd.crt
@@ -7,6 +5,8 @@ cert_key = lxd.key
 verify = False
 
 [smtp]
+enabled = False
+notify_user = True
 sender = lxd@example.com
 recipient = support@example.com
 server = smtp.example.com
@@ -16,3 +16,18 @@ password =
 
 [app]
 production_name = LXDmanager.com
+
+[price]
+enabled = False
+cpu = 1
+memory = 0.01
+disk = 0.1
+discount_month = 1
+discount_months = 1
+discount_halfyear = 1
+discount_year = 1
+discount_years = 1
+
+[storage]
+enabled = False
+pool_name = lxd

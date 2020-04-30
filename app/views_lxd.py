@@ -4,59 +4,63 @@ from flask import request
 from flask_restplus import Resource
 from flask_jwt_extended import jwt_required
 from .decorators import *
-from .fields.containers import *
+from .fields.instances import *
 from .fields.stats import *
 from .fields.snapshots import *
 from .fields.hosts import *
+from app import redis_store
 import lgw
-
+import json
+import time
 
 ##################
-# Containers API #
+# Instances API #
 ##################
-class ContainersList(Resource):
+class InstancesList(Resource):
     decorators = [jwt_required, otp_confirmed]
 
-    @user_has('containers_infos_all')
-    @api.marshal_with(containers_fields_get_many)
+    @user_has('instances_infos_all')
+    @api.marshal_with(instances_fields_get_many)
     def get(self):
         """
-        Get containers list
-        :return: containers data
+        Get instances list
+        :return: instances data
         """
-        populate_containers_table()
+        populate_instances_table()
         current_identity = import_user()
-        containers = []
+        instances = []
 
-        for c in Container.query.all():
-            container = Container.query.filter_by(name=c.name).first()
-            if c.id in current_identity.containers or current_identity.admin:
-                # containers.append('/api/v1/containers/' + c.name)  # USE THIS LINE FOR QUERY BY NAME
-                # containers.append('/api/v1/containers/' + str(c.id))
+        starttime = time.time()
+        for c in Instance.query.all():
+            instance = Instance.query.filter_by(name=c.name).first()
+            if c.id in current_identity.instances or current_identity.admin:
+                instance_json = instance.__jsonapi__()
 
-                container_json = container.__jsonapi__()
-                # url = '/api/v1/containers/' + str(i.id)
-                # container_json['attributes']['url'] = url
+                try:
+                    instance_json.update(json.loads(redis_store.get('cts:'+c.name+':info')))
+                    instance_json['state'] = (json.loads(redis_store.get('cts:' + c.name + ':state')))
+                except TypeError:
+                    res = lgw.lxd_api_get('instances/' + c.name)
+                    instance_json.update(res.json()['metadata'])
+                    res_state = lgw.lxd_api_get('instances/' + c.name + '/state')
+                    instance_json['state'] = res_state.json()['metadata']
 
-                res = lgw.lxd_api_get('containers/' + c.name)
-                container_json.update(res.json()['metadata'])
-                res_state = lgw.lxd_api_get('containers/' + c.name + '/state')
-                container_json['state'] = res_state.json()['metadata']
-                containers.append(container_json)
+                instances.append(instance_json)
 
-        return {'data': containers}
+        #print('time: ', time.time() - starttime)
+        return {'data': instances}
 
-    @user_has('containers_create')
-    @api.expect(containers_fields_post, validate=False)
-    # @api.marshal_with(containers_fields_get)
+    @user_has('instances_create')
+    @api.expect(instances_fields_post, validate=False)
+    # @api.marshal_with(instances_fields_get)
     @api.doc(responses={
-        201: 'Container created',
-        409: 'Container already exists',
-        500: 'Can\'t create container'
+        201: 'Instance created',
+        409: 'Instance already exists',
+        500: 'Can\'t create instance'
     })
     def post(self):
         """
-        Create container based on POST data with image from linuxcontainers.org
+        Create instance based on POST data with image from linuxcontainers.org
 
         Example:
         data = {'name': 'vpsX', 'source': {'type': 'image', 'mode': 'pull',
@@ -70,7 +74,7 @@ class ContainersList(Resource):
         # print(data)
         
         if 'name' in data:
-            c = Container.query.filter_by(name=data['name']).first()
+            c = Instance.query.filter_by(name=data['name']).first()
             if not c:
                 config = {'name': data['name'],
                           # 'source': {'type': 'image',
@@ -97,91 +101,95 @@ class ContainersList(Resource):
                             config['devices']['root']['size'] = data['config']['limits_disk']
 
                 try:
-                    res = lgw.lxd_api_post('containers', data=config)
+                    res = lgw.lxd_api_post('instances', data=config)
                     # print(res.text)
                 except Exception as e:
-                    api.abort(code=500, message='Can\'t create container')
+                    api.abort(code=500, message='Can\'t create instance')
 
                 if res.status_code == 202:
-                    # Add container to database
-                    container = Container(name=data['name'])
-                    db.session.add(container)
+                    # Add instance to database
+                    instance = Instance(name=data['name'])
+                    db.session.add(instance)
                     db.session.commit()
-                    # Get container ID
-                    container = Container.query.filter_by(
+                    # Get instance ID
+                    instance = Instance.query.filter_by(
                         name=data['name']).first()
-                    # Add container to allowed users
+                    # Add instance to allowed users
                     if current_identity.admin:
                         try:
                             users_id = list(id['id'] for id in data['relationships']['users'])
                             for user_id in users_id:
                                 user = User.query.get(user_id)
-                                user.containers.append(container.id)
+                                user.instances.append(instance.id)
                                 db.session.commit()
                         except KeyError:
                             pass
                         except AttributeError:
                             api.abort(code=500, message='User doesn\'t exists')
-                    # Add container to current user
+                    # Add instance to current user
                     else:
                         user = User.query.get(current_identity.id)
-                        user.containers.append(container.id)
+                        user.instances.append(instance.id)
                         db.session.commit()
                 else:
-                    api.abort(code=res.status_code, message='Error when creating container')
+                    api.abort(code=res.status_code, message='Error when creating instance')
 
-                # container_json = container.__jsonapi__()
-                # return {'data': container_json}
+                # instance_json = instance.__jsonapi__()
+                # return {'data': instance_json}
                 return res.json()
-            api.abort(code=409, message='Container already exists')
+            api.abort(code=409, message='Instance already exists')
 
 
-class Containers(Resource):
+class Instances(Resource):
     decorators = [jwt_required, otp_confirmed]
 
-    @user_has('containers_infos')
-    @api.marshal_with(containers_fields_get)
+    @user_has('instances_infos')
+    @api.marshal_with(instances_fields_get)
     def get(self, id):
         """
-        Container information
+        Instance information
         :param id:
-        :return: container data
+        :return: instance data
         """
 
-        populate_containers_table()
+        populate_instances_table()
         current_identity = import_user()
         try:
-            # c = Container.query.filter_by(name=name).first()  # USE FOR QUERY BY NAME
-            c = Container.query.filter_by(id=id).first()
-            if c and (c.id in current_identity.containers or current_identity.admin):
-                res = lgw.lxd_api_get('containers/' + c.name)
-                container_json = c.__jsonapi__()
-                container_json.update(res.json()['metadata'])
-                res_state = lgw.lxd_api_get('containers/' + c.name + '/state')
-                container_json['state'] = res_state.json()['metadata']
+            # c = Instance.query.filter_by(name=name).first()  # USE FOR QUERY BY NAME
+            c = Instance.query.filter_by(id=id).first()
+            if c and (c.id in current_identity.instances or current_identity.admin):
+                res = lgw.lxd_api_get('instances/' + c.name)
+                instance_json = c.__jsonapi__()
+                instance_json.update(res.json()['metadata'])
+                res_state = lgw.lxd_api_get('instances/' + c.name + '/state')
+                instance_json['state'] = res_state.json()['metadata']
 
-                return {'data': container_json}
+                # update redis data about instance
+                redis_store.set('cts:' + c.name + ':info', json.dumps(res.json()['metadata']))
+                redis_store.set('cts:' + c.name + ':state', json.dumps(res_state.json()['metadata']))
+
+                return {'data': instance_json}
             else:
                 api.abort(code=403, message='Unauthorized access')
         except KeyError:
-            api.abort(code=404, message='Container doesn\'t exists')
+            api.abort(code=404, message='Instance doesn\'t exists')
 
 
-    @user_has('containers_update')
-    @api.expect(containers_fields_put, validate=True)
-    @api.marshal_with(containers_fields_put)
+    @user_has('instances_update')
+    @api.expect(instances_fields_put, validate=True)
+    @api.marshal_with(instances_fields_put)
     @api.doc(responses={
-        200: 'Container config changed',
-        404: 'Container doesn\'t exists',
-        500: 'Can\'t update container config'
+        200: 'Instance config changed',
+        404: 'Instance doesn\'t exists',
+        500: 'Can\'t update instance config'
     })
     def put(self, id, d=None):
         """
-        Change container name and config
+        Change instance name and config
         # use patch instead of put to set only selected config
         :param id:
         :param d:
-        :return: container data
+        :return: instance data
         """
 
         if d:
@@ -192,95 +200,104 @@ class Containers(Resource):
         current_identity = import_user()
 
         try:
-            c = Container.query.get(id)
-            if c.name and (id in current_identity.containers or current_identity.admin):
+            c = Instance.query.get(id)
+            if c.name and (id in current_identity.instances or current_identity.admin):
                 if 'limits_cpu' in data['config']:
                     config = {
                               'config': {'limits.cpu': str(data['config']['limits_cpu'])}}
                     try:
-                        res = lgw.lxd_api_patch('containers/'+c.name, data=config)
+                        res = lgw.lxd_api_patch('instances/'+c.name, data=config)
                         # print(res.text)
                     except Exception as e:
-                        api.abort(code=500, message='Can\'t create container')
+                        api.abort(code=500, message='Can\'t create instance')
                 if 'limits_memory' in data['config']:
                     config = {
                         'config': {'limits.memory': data['config']['limits_memory']}}
                     try:
-                        res = lgw.lxd_api_patch('containers/'+c.name, data=config)
+                        res = lgw.lxd_api_patch('instances/'+c.name, data=config)
                         # print(res.text)
                     except Exception as e:
-                        api.abort(code=500, message='Can\'t create container')
+                        api.abort(code=500, message='Can\'t create instance')
+
+                # Delete redis cache
+                redis_store.delete('cts:' + c.name + ':info')
+                redis_store.delete('cts:' + c.name + ':state')
 
             else:
-                api.abort(code=404, message='Container doesn\'t exists')
+                api.abort(code=404, message='Instance doesn\'t exists')
         except:
-            api.abort(code=404, message='Container doesn\'t exists')
+            api.abort(code=404, message='Instance doesn\'t exists')
 
         return {'data': data}
 
-    @user_has('containers_delete')
+    @user_has('instances_delete')
     @api.doc(responses={
-        204: 'Container deleted',
-        400: 'Container is running',
-        404: 'Container doesn\'t exists'
+        204: 'Instance deleted',
+        400: 'Instance is running',
+        404: 'Instance doesn\'t exists'
     })
     def delete(self, id):
         """
-        Delete container
+        Delete instance
         :param id:
         :return status code
         """
 
-        populate_containers_table()
+        populate_instances_table()
         current_identity = import_user()
 
         try:
-            c = Container.query.get(id)
+            c = Instance.query.get(id)
             # print(c)
         except:
-            api.abort(code=404, message='Container doesn\'t exists')
+            api.abort(code=404, message='Instance doesn\'t exists')
 
-        if id in current_identity.containers or current_identity.admin:
-            res = lgw.lxd_api_delete('containers/' + c.name)
+        if id in current_identity.instances or current_identity.admin:
+            res = lgw.lxd_api_delete('instances/' + c.name)
             # print(res.status_code)
             if res.status_code == 400:
-                api.abort(code=404, message='Container is running')
+                api.abort(code=404, message='Instance is running')
             if res.status_code == 404:
-                api.abort(code=404, message='Container not found')
+                api.abort(code=404, message='Instance not found')
             if res.status_code == 202:
                 db.session.delete(c)
                 db.session.commit()
                 return {}, 204
+
+            # Delete redis cache
+            redis_store.delete('cts:' + c.name + ':info')
+            redis_store.delete('cts:' + c.name + ':state')
+
         else:
-            api.abort(code=404, message='Container not found')
+            api.abort(code=404, message='Instance not found')
 
 
-class ContainersState(Resource):
+class InstancesState(Resource):
     decorators = [jwt_required, otp_confirmed]
 
-    @user_has('containers_state_infos')
-    # @api.marshal_with(containers_fields_get)
+    @user_has('instances_state_infos')
+    # @api.marshal_with(instances_fields_get)
     def get(self, id):
         """
-        Container state information
+        Instance state information
         :param id:
-        :return container data
+        :return instance data
         """
 
-        populate_containers_table()
+        populate_instances_table()
         current_identity = import_user()
         try:
-            # c = Container.query.filter_by(name=name).first()  # USE FOR QUERY BY NAME
-            c = Container.query.filter_by(id=id).first()
-            if c and (c.id in current_identity.containers or current_identity.admin):
-                res = lgw.lxd_api_get('containers/' + c.name + '/state')
+            # c = Instance.query.filter_by(name=name).first()  # USE FOR QUERY BY NAME
+            c = Instance.query.filter_by(id=id).first()
+            if c and (c.id in current_identity.instances or current_identity.admin):
+                res = lgw.lxd_api_get('instances/' + c.name + '/state')
                 return {'data': res.json()}
             else:
                 api.abort(code=403, message='Unauthorized access')
         except:
-            api.abort(code=404, message='Container doesn\'t exists')
+            api.abort(code=404, message='Instance doesn\'t exists')
 
-    @user_has('containers_state_update')
+    @user_has('instances_state_update')
     def put(self, id, d=None):
         """
         :return
@@ -292,29 +309,34 @@ class ContainersState(Resource):
 
         current_identity = import_user()
         try:
-            # c = Container.query.filter_by(name=name).first()  # USE FOR QUERY BY NAME
-            c = Container.query.filter_by(id=id).first()
-            if c and (c.id in current_identity.containers or current_identity.admin):
-                res = lgw.lxd_api_put('containers/' + c.name + '/state', data)
+            # c = Instance.query.filter_by(name=name).first()  # USE FOR QUERY BY NAME
+            c = Instance.query.filter_by(id=id).first()
+            if c and (c.id in current_identity.instances or current_identity.admin):
+                res = lgw.lxd_api_put('instances/' + c.name + '/state', data)
+
+                # Delete redis cache
+                redis_store.delete('cts:' + c.name + ':info')
+                redis_store.delete('cts:' + c.name + ':state')
+
                 return {'data': res.json()}
             else:
                 api.abort(code=403, message='Unauthorized access')
         except:
-            api.abort(code=404, message='Container doesn\'t exists')
+            api.abort(code=404, message='Instance doesn\'t exists')
 
 
-class ContainersStart(Resource):
+class InstancesStart(Resource):
     decorators = [jwt_required, otp_confirmed]
 
-    @user_has('containers_start')
+    @user_has('instances_start')
     @api.doc(responses={
-        200: 'Container started',
-        404: 'Container doesn\'t exists',
+        200: 'Instance started',
+        404: 'Instance doesn\'t exists',
         403: 'Start timed out'
     })
     def post(self, id):
         """
-        Start container
+        Start instance
         :param id:
         :return status code
         """
@@ -326,29 +348,34 @@ class ContainersStart(Resource):
 
         current_identity = import_user()
         try:
-            # c = Container.query.filter_by(name=name).first()  # USE FOR QUERY BY NAME
-            c = Container.query.filter_by(id=id).first()
-            if c and (c.id in current_identity.containers or current_identity.admin):
-                res = lgw.lxd_api_put('containers/' + c.name + '/state', data)
+            # c = Instance.query.filter_by(name=name).first()  # USE FOR QUERY BY NAME
+            c = Instance.query.filter_by(id=id).first()
+            if c and (c.id in current_identity.instances or current_identity.admin):
+                res = lgw.lxd_api_put('instances/' + c.name + '/state', data)
+
+                # Delete redis cache
+                redis_store.delete('cts:' + c.name + ':info')
+                redis_store.delete('cts:' + c.name + ':state')
+
                 return res.json()
             else:
                 api.abort(code=403, message='Unauthorized access')
         except:
-            api.abort(code=404, message='Container doesn\'t exists')
+            api.abort(code=404, message='Instance doesn\'t exists')
 
 
-class ContainersFreeze(Resource):
+class InstancesFreeze(Resource):
     decorators = [jwt_required, otp_confirmed]
 
-    @user_has('containers_freeze')
+    @user_has('instances_freeze')
     @api.doc(responses={
-        204: 'Container frozen',
-        404: 'Container doesn\'t exists',
+        204: 'Instance frozen',
+        404: 'Instance doesn\'t exists',
         500: 'Freeze timed out'
     })
     def post(self, id):
         """
-        Freeze container
+        Freeze instance
         :param id:
         :return data
         """
@@ -359,29 +386,34 @@ class ContainersFreeze(Resource):
 
         current_identity = import_user()
         try:
-            # c = Container.query.filter_by(name=name).first()  # USE FOR QUERY BY NAME
-            c = Container.query.filter_by(id=id).first()
-            if c and (c.id in current_identity.containers or current_identity.admin):
-                res = lgw.lxd_api_put('containers/' + c.name + '/state', data)
+            # c = Instance.query.filter_by(name=name).first()  # USE FOR QUERY BY NAME
+            c = Instance.query.filter_by(id=id).first()
+            if c and (c.id in current_identity.instances or current_identity.admin):
+                res = lgw.lxd_api_put('instances/' + c.name + '/state', data)
+
+                # Delete redis cache
+                redis_store.delete('cts:' + c.name + ':info')
+                redis_store.delete('cts:' + c.name + ':state')
+
                 return res.json()
             else:
                 api.abort(code=403, message='Unauthorized access')
         except:
-            api.abort(code=404, message='Container doesn\'t exists')
+            api.abort(code=404, message='Instance doesn\'t exists')
 
 
-class ContainersUnfreeze(Resource):
+class InstancesUnfreeze(Resource):
     decorators = [jwt_required, otp_confirmed]
 
-    @user_has('containers_unfreeze')
+    @user_has('instances_unfreeze')
     @api.doc(responses={
-        204: 'Container thawed',
-        404: 'Container doesn\'t exists',
+        204: 'Instance thawed',
+        404: 'Instance doesn\'t exists',
         500: 'Unfreeze timed out'
     })
     def post(self, id):
         """
-        Unfreeze container
+        Unfreeze instance
         :param id
         :return data
         """
@@ -392,29 +424,34 @@ class ContainersUnfreeze(Resource):
 
         current_identity = import_user()
         try:
-            # c = Container.query.filter_by(name=name).first()  # USE FOR QUERY BY NAME
-            c = Container.query.filter_by(id=id).first()
-            if c and (c.id in current_identity.containers or current_identity.admin):
-                res = lgw.lxd_api_put('containers/' + c.name + '/state', data)
+            # c = Instance.query.filter_by(name=name).first()  # USE FOR QUERY BY NAME
+            c = Instance.query.filter_by(id=id).first()
+            if c and (c.id in current_identity.instances or current_identity.admin):
+                res = lgw.lxd_api_put('instances/' + c.name + '/state', data)
+
+                # Delete redis cache
+                redis_store.delete('cts:' + c.name + ':info')
+                redis_store.delete('cts:' + c.name + ':state')
+
                 return res.json()
             else:
                 api.abort(code=403, message='Unauthorized access')
         except:
-            api.abort(code=404, message='Container doesn\'t exists')
+            api.abort(code=404, message='Instance doesn\'t exists')
 
 
-class ContainersStop(Resource):
+class InstancesStop(Resource):
     decorators = [jwt_required, otp_confirmed]
 
-    @user_has('containers_stop')
+    @user_has('instances_stop')
     @api.doc(responses={
-        204: 'Container stopped',
-        404: 'Container doesn\'t exists',
+        204: 'Instance stopped',
+        404: 'Instance doesn\'t exists',
         500: 'Stop timed out'
     })
     def post(self, id):
         """
-        Stop container
+        Stop instance
         :param id:
         :return data
         """
@@ -425,29 +462,34 @@ class ContainersStop(Resource):
 
         current_identity = import_user()
         try:
-            # c = Container.query.filter_by(name=name).first()  # USE FOR QUERY BY NAME
-            c = Container.query.filter_by(id=id).first()
-            if c and (c.id in current_identity.containers or current_identity.admin):
-                res = lgw.lxd_api_put('containers/' + c.name + '/state', data)
+            # c = Instance.query.filter_by(name=name).first()  # USE FOR QUERY BY NAME
+            c = Instance.query.filter_by(id=id).first()
+            if c and (c.id in current_identity.instances or current_identity.admin):
+                res = lgw.lxd_api_put('instances/' + c.name + '/state', data)
+
+                # Delete redis cache
+                redis_store.delete('cts:' + c.name + ':info')
+                redis_store.delete('cts:' + c.name + ':state')
+
                 return res.json()
             else:
                 api.abort(code=403, message='Unauthorized access')
         except:
-            api.abort(code=404, message='Container doesn\'t exists')
+            api.abort(code=404, message='Instance doesn\'t exists')
 
 
-class ContainersStopForce(Resource):
+class InstancesStopForce(Resource):
     decorators = [jwt_required, otp_confirmed]
 
-    @user_has('containers_stop_force')
+    @user_has('instances_stop_force')
     @api.doc(responses={
-        204: 'Container stopped',
-        404: 'Container doesn\'t exists',
+        204: 'Instance stopped',
+        404: 'Instance doesn\'t exists',
         500: 'Stop timed out'
     })
     def post(self, id):
         """
-        Stop container
+        Stop instance
         :param id:
         :return data
         """
@@ -459,29 +501,34 @@ class ContainersStopForce(Resource):
 
         current_identity = import_user()
         try:
-            # c = Container.query.filter_by(name=name).first()  # USE FOR QUERY BY NAME
-            c = Container.query.filter_by(id=id).first()
-            if c and (c.id in current_identity.containers or current_identity.admin):
-                res = lgw.lxd_api_put('containers/' + c.name + '/state', data)
+            # c = Instance.query.filter_by(name=name).first()  # USE FOR QUERY BY NAME
+            c = Instance.query.filter_by(id=id).first()
+            if c and (c.id in current_identity.instances or current_identity.admin):
+                res = lgw.lxd_api_put('instances/' + c.name + '/state', data)
+
+                # Delete redis cache
+                redis_store.delete('cts:' + c.name + ':info')
+                redis_store.delete('cts:' + c.name + ':state')
+
                 return res.json()
             else:
                 api.abort(code=403, message='Unauthorized access')
         except:
-            api.abort(code=404, message='Container doesn\'t exists')
+            api.abort(code=404, message='Instance doesn\'t exists')
 
 
-class ContainersRestart(Resource):
+class InstancesRestart(Resource):
     decorators = [jwt_required, otp_confirmed]
 
-    @user_has('containers_restart')
+    @user_has('instances_restart')
     @api.doc(responses={
-        204: 'Container restarted',
-        404: 'Container doesn\'t exists',
+        204: 'Instance restarted',
+        404: 'Instance doesn\'t exists',
         500: 'Restart timed out'
     })
     def post(self, id):
         """
-        Restart container
+        Restart instance
         :param id:
         :return data
         """
@@ -492,24 +539,29 @@ class ContainersRestart(Resource):
 
         current_identity = import_user()
         try:
-            # c = Container.query.filter_by(name=name).first()  # USE FOR QUERY BY NAME
-            c = Container.query.filter_by(id=id).first()
-            if c and (c.id in current_identity.containers or current_identity.admin):
-                res = lgw.lxd_api_put('containers/' + c.name + '/state', data)
+            # c = Instance.query.filter_by(name=name).first()  # USE FOR QUERY BY NAME
+            c = Instance.query.filter_by(id=id).first()
+            if c and (c.id in current_identity.instances or current_identity.admin):
+                res = lgw.lxd_api_put('instances/' + c.name + '/state', data)
+
+                # Delete redis cache
+                redis_store.delete('cts:' + c.name + ':info')
+                redis_store.delete('cts:' + c.name + ':state')
+
                 return res.json()
             else:
                 api.abort(code=403, message='Unauthorized access')
         except:
-            api.abort(code=404, message='Container doesn\'t exists')
+            api.abort(code=404, message='Instance doesn\'t exists')
 
 
-class ContainersExec(Resource):
+class InstancesExec(Resource):
     decorators = [jwt_required, otp_confirmed]
 
-    @user_has('containers_console')
+    @user_has('instances_console')
     def post(self, id):
         """
-        Open container terminal
+        Open instance terminal
         :param id
         :return terminal data
         """
@@ -518,7 +570,7 @@ class ContainersExec(Resource):
             'command': ['/bin/bash'],       # Command and arguments
             'environment': {},              # Optional extra environment variables to set
             'wait-for-websocket': True,    # Whether to wait for a connection before starting the process
-            'record-output': False,         # Whether to store stdout and stderr (only valid with wait-for-websocket=false) (requires API extension container_exec_recording)
+            'record-output': False,         # Whether to store stdout and stderr (only valid with wait-for-websocket=false) (requires API extension instance_exec_recording)
             'interactive': True,            # Whether to allocate a pts device instead of PIPEs
             'width': 80,                    # Initial width of the terminal (optional)
             'height': 25,                   # Initial height of the terminal (optional)
@@ -529,17 +581,17 @@ class ContainersExec(Resource):
 
         current_identity = import_user()
         try:
-            # c = Container.query.filter_by(name=name).first()  # USE FOR QUERY BY NAME
-            c = Container.query.filter_by(id=id).first()
-            if c and (c.id in current_identity.containers or current_identity.admin):
-                res = lgw.lxd_api_post('containers/' + c.name + '/console', {}) #'/exec', data
+            # c = Instance.query.filter_by(name=name).first()  # USE FOR QUERY BY NAME
+            c = Instance.query.filter_by(id=id).first()
+            if c and (c.id in current_identity.instances or current_identity.admin):
+                res = lgw.lxd_api_post('instances/' + c.name + '/console', {}) #'/exec', data
                 # return res.json()
                 # return {'data': {'type': 'terminal', 'id': id, 'attributes': res.json()}}, 201
                 return {'data': res.json()}
             else:
                 api.abort(code=403, message='Unauthorized access')
         except:
-            api.abort(code=404, message='Container doesn\'t exists')
+            api.abort(code=404, message='Instance doesn\'t exists')
 
 
 ##################
@@ -557,11 +609,11 @@ class SnapshotsList(Resource):
         Get snapshot list
         """
         current_identity = import_user()
-        container = Container.query.get(id)
+        instance = Instance.query.get(id)
         snapshots = []
 
-        if container.name and (id in current_identity.containers or current_identity.admin):
-            res = lgw.lxd_api_get('containers/' + container.name + '/snapshots?recursion=1') #recursion=1 returns objects
+        if instance.name and (id in current_identity.instances or current_identity.admin):
+            res = lgw.lxd_api_get('instances/' + instance.name + '/snapshots?recursion=1') #recursion=1 returns objects
             for i, r in enumerate(res.json()['metadata']):
                 # print(r['name'] + r['created_at'] + str(r['stateful']))
                 snapshot_json = {'type': 'snapshots', 'id': i, 'attributes': {'name': r['name'], 'created_at': r['created_at'],
@@ -570,7 +622,7 @@ class SnapshotsList(Resource):
             # return {'data': res.json()['metadata']}
             return {'data': snapshots}
         else:
-            api.abort(code=404, message='Container not found')
+            api.abort(code=404, message='Instance not found')
 
     @user_has('snapshots_create')
     @api.expect(snapshots_fields_post, validate=True)
@@ -587,18 +639,18 @@ class SnapshotsList(Resource):
         data = request.get_json()['data']
 
         current_identity = import_user()
-        container = Container.query.get(id)
+        instance = Instance.query.get(id)
 
-        if container.name and (id in current_identity.containers or current_identity.admin):
-            if not container:
+        if instance.name and (id in current_identity.instances or current_identity.admin):
+            if not instance:
                 api.abort(code=409, message='Snapshot name already exists')
             else:
                 res = lgw.lxd_api_post(
-                    'containers/' + container.name + '/snapshots', {'name': data['name'], 'stateful': False})  # recursion=1 returns objects
+                    'instances/' + instance.name + '/snapshots', {'name': data['name'], 'stateful': False})  # recursion=1 returns objects
                 # print(res.json())
                 return {'data': res.json()['metadata']}
 
-        api.abort(code=500, message='Can\'t create container')
+        api.abort(code=500, message='Can\'t create instance')
 
 
 class Snapshots(Resource):
@@ -611,11 +663,11 @@ class Snapshots(Resource):
         Get snapshot
         """
         current_identity = import_user()
-        container = Container.query.get(id)
+        instance = Instance.query.get(id)
 
-        if container.name and (id in current_identity.containers or current_identity.admin):
+        if instance.name and (id in current_identity.instances or current_identity.admin):
             try:
-                res = lgw.lxd_api_get('containers/' + container.name + '/snapshots/' + name)
+                res = lgw.lxd_api_get('instances/' + instance.name + '/snapshots/' + name)
                 r = res.json()['metadata']
                 # print(r)
                 snapshot_json = {'type': 'snapshots', 'attributes': {'name': r['name'], 'created_at': r['created_at'],
@@ -624,7 +676,7 @@ class Snapshots(Resource):
             except:
                 api.abort(code=404, message='Snapshot doesn\'t exists')
 
-        api.abort(code=404, message='Container doesn\'t exists')
+        api.abort(code=404, message='Instance doesn\'t exists')
 
     @user_has('snapshots_rename')
     @api.expect(snapshots_fields_put, validate=True)
@@ -639,22 +691,22 @@ class Snapshots(Resource):
             data = request.get_json()['data']
 
         current_identity = import_user()
-        container = Container.query.get(id)
+        instance = Instance.query.get(id)
 
-        if container.name and (id in current_identity.containers or current_identity.admin):
+        if instance.name and (id in current_identity.instances or current_identity.admin):
             try:
-                res = lgw.lxd_api_get('containers/' + container.name + '/snapshots/' + name)
+                res = lgw.lxd_api_get('instances/' + instance.name + '/snapshots/' + name)
                 r = res.json()['metadata']
                 if r['expires_at']:
                     try:
-                        res = lgw.lxd_api_put('containers/' + container.name + '/snapshots/' + name, {'expires_at': data['expires_at']})
+                        res = lgw.lxd_api_put('instances/' + instance.name + '/snapshots/' + name, {'expires_at': data['expires_at']})
                         return {}, 204
                     except:
                         api.abort(code=500, message='Error deleting snapshot')
             except:
                 api.abort(code=404, message='Snapshot doesn\'t exists')
 
-        api.abort(code=404, message='Container doesn\'t exists')
+        api.abort(code=404, message='Instance doesn\'t exists')
         
     @user_has('snapshots_delete')
     def delete(self, id, name):
@@ -662,21 +714,21 @@ class Snapshots(Resource):
         Delete snapshot
         """
         current_identity = import_user()
-        container = Container.query.get(id)
+        instance = Instance.query.get(id)
 
-        if container.name and (id in current_identity.containers or current_identity.admin):
+        if instance.name and (id in current_identity.instances or current_identity.admin):
             try:
-                resx = lgw.lxd_api_get('containers/' + container.name + '/snapshots/' + name)
+                resx = lgw.lxd_api_get('instances/' + instance.name + '/snapshots/' + name)
                 if resx:
                     try:
-                        res = lgw.lxd_api_delete('containers/' + container.name + '/snapshots/' + name)
+                        res = lgw.lxd_api_delete('instances/' + instance.name + '/snapshots/' + name)
                         return {}, 204
                     except:
                         api.abort(code=500, message='Error deleting snapshot')
             except:
                 api.abort(code=404, message='Snapshot doesn\'t exists')
 
-        api.abort(code=404, message='Container doesn\'t exists')
+        api.abort(code=404, message='Instance doesn\'t exists')
 
 
 class SnapshotsRestore(Resource):
@@ -693,21 +745,21 @@ class SnapshotsRestore(Resource):
         Restore snapshot
         """
         current_identity = import_user()
-        container = Container.query.get(id)
+        instance = Instance.query.get(id)
 
-        if container.name and (id in current_identity.containers or current_identity.admin):
+        if instance.name and (id in current_identity.instances or current_identity.admin):
             try:
-                resx = lgw.lxd_api_get('containers/' + container.name + '/snapshots/' + name)
+                resx = lgw.lxd_api_get('instances/' + instance.name + '/snapshots/' + name)
                 if resx:
                     try:
-                        res = lgw.lxd_api_put('containers/' + container.name, {'restore': name})
+                        res = lgw.lxd_api_put('instances/' + instance.name, {'restore': name})
                         return {}, 204
                     except:
                         api.abort(code=500, message='Error restoring snapshot')
             except:
                 api.abort(code=404, message='Snapshot doesn\'t exists')
 
-        api.abort(code=404, message='Container doesn\'t exists')
+        api.abort(code=404, message='Instance doesn\'t exists')
 
 
 ##################
@@ -717,7 +769,7 @@ class ImagesList(Resource):
     decorators = [jwt_required, otp_confirmed]
 
     @user_has('images_infos_all')
-    # @api.marshal_with(containers_fields_get_many)
+    # @api.marshal_with(instances_fields_get_many)
     def get(self):
         """
         Get images list
@@ -878,7 +930,7 @@ class RemoteImagesList(Resource):
     decorators = [jwt_required, otp_confirmed]
 
     @user_has('images_remote_infos_all')
-    # @api.marshal_with(containers_fields_get_many)
+    # @api.marshal_with(instances_fields_get_many)
     def get(self):
         """
         Get images list
@@ -889,7 +941,7 @@ class RemoteImagesList(Resource):
         if current_identity.admin:
             # res = lgw.lxd_api_get('images?recursion=1')
             res = lgw.lxd_remote_get()
-            # res = requests.get('https://uk.images.linuxcontainers.org' + '/1.0/images/aliases', timeout=10)
+            # res = requests.get('https://uk.images.linuxinstances.org' + '/1.0/images/aliases', timeout=10)
             return {'data': res.json()['metadata']}
 
 
@@ -948,24 +1000,26 @@ class CtsStats(Resource):
     @user_has('stats_infos')
     def get(self):
         """
-        Containers stats resources
+        Instances stats resources
         :return data
         """
 
-        populate_containers_table()
+        populate_instances_table()
         current_identity = import_user()
         alist = []
 
         all = []
-        res = lgw.lxd_api_get('containers')
+        res = lgw.lxd_api_get('instances')
         for c in res.json()['metadata']:
-            all.append(c[16:])
+            all.append(c[15:])
 
         for ct in all:
-            container = Container.query.filter_by(name=ct).first()
-            if container.id in current_identity.containers or current_identity.admin:
+            instance = Instance.query.filter_by(name=ct).first()
+            if instance.id in current_identity.instances or current_identity.admin:
                 alist.append(ct)
 
-        json_output = lgw.cts_stats(alist)
+        start_time = time.time()
+        json_output = lgw.cts_stats(alist, redis_store)
+        #print('time stats: ', time.time() - start_time)
         return {'data': json_output}
 

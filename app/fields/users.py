@@ -64,7 +64,7 @@ users_fields_with_relationships_post_put = api.model('UsersFieldsWithRelationshi
             'type': fields.String,
             'id': fields.Integer
         }), as_list=True),
-        'containers': fields.Nested(api.model('ContainersDataPost', {
+        'instances': fields.Nested(api.model('ContainersDataPost', {
             'type': fields.String,
             'id': fields.Integer
         }), as_list=True)
@@ -77,7 +77,7 @@ users_fields_with_relationships_get = api.model('UsersFieldsWithRelationshipsPos
             'id': fields.Integer,
             'name': fields.String
         }), as_list=True),
-        'containers': fields.Nested(api.model('ContainersDataPost', {
+        'instances': fields.Nested(api.model('ContainersDataPost', {
             'id': fields.Integer,
             'name': fields.String
         }), as_list=True),

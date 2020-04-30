@@ -23,16 +23,16 @@ nslgw.add_resource(Abilities, '/abilities/<int:id>')
 nslgw.add_resource(RequestsList, '/requests')
 nslgw.add_resource(Requests, '/requests/<int:id>')
 
-# Containers routes
-nslxc.add_resource(ContainersList, '/containers')
-nslxc.add_resource(Containers, '/containers/<int:id>')
-nslxc.add_resource(ContainersStart, '/containers/<int:id>/start')
-nslxc.add_resource(ContainersFreeze, '/containers/<int:id>/freeze')
-nslxc.add_resource(ContainersUnfreeze, '/containers/<int:id>/unfreeze')
-nslxc.add_resource(ContainersStop, '/containers/<int:id>/stop')
-nslxc.add_resource(ContainersRestart, '/containers/<int:id>/restart')
-nslxc.add_resource(ContainersExec, '/containers/<int:id>/exec')
-nslxc.add_resource(ContainersState, '/containers/<int:id>/state')
+# Instances routes
+nslxc.add_resource(InstancesList, '/instances')
+nslxc.add_resource(Instances, '/instances/<int:id>')
+nslxc.add_resource(InstancesStart, '/instances/<int:id>/start')
+nslxc.add_resource(InstancesFreeze, '/instances/<int:id>/freeze')
+nslxc.add_resource(InstancesUnfreeze, '/instances/<int:id>/unfreeze')
+nslxc.add_resource(InstancesStop, '/instances/<int:id>/stop')
+nslxc.add_resource(InstancesRestart, '/instances/<int:id>/restart')
+nslxc.add_resource(InstancesExec, '/instances/<int:id>/exec')
+nslxc.add_resource(InstancesState, '/instances/<int:id>/state')
 
 # Special and config routes
 nslxc.add_resource(Operations, '/operations/<string:id>')
@@ -43,9 +43,9 @@ nslxc.add_resource(LxcHostResources, '/resources')
 nslxc.add_resource(LxcCheckConfig, '/checkconfig')
 
 # Snapshots routes
-nslxc.add_resource(SnapshotsList, '/containers/<int:id>/snapshots')
-nslxc.add_resource(Snapshots, '/containers/<int:id>/snapshots/<string:name>')
-nslxc.add_resource(SnapshotsRestore, '/containers/<int:id>/snapshots/<string:name>/restore')
+nslxc.add_resource(SnapshotsList, '/instances/<int:id>/snapshots')
+nslxc.add_resource(Snapshots, '/instances/<int:id>/snapshots/<string:name>')
+nslxc.add_resource(SnapshotsRestore, '/instances/<int:id>/snapshots/<string:name>/restore')
 
 # Images routes
 nslxc.add_resource(ImagesList, '/images')

@@ -33,11 +33,11 @@ def _ability_find(a):
     return ability
 
 
-def _container_find(c):
-    container = Container.query.get(c)
-    if not(container):
-        raise ContainerDoesntExist(c)
-    return container
+def _instance_find(c):
+    instance = Instance.query.get(c)
+    if not(instance):
+        raise InstanceDoesntExist(c)
+    return instance
 
 
 def _request_find(r):
@@ -75,17 +75,17 @@ group_ability_table = db.Table(
     )
 )
 
-user_container_table = db.Table(
-    'user_container',
+user_instance_table = db.Table(
+    'user_instance',
     db.Column(
         'user_id',
         db.Integer,
         db.ForeignKey('users.id')
     ),
     db.Column(
-        'container_id',
+        'instance_id',
         db.Integer,
-        db.ForeignKey('containers.id')
+        db.ForeignKey('instances.id')
     )
 )
 
@@ -133,14 +133,14 @@ class User(db.Model):
         'id',
         creator=_group_find
     )
-    _containers = db.relationship(
-        'Container',
-        secondary=user_container_table,
+    _instances = db.relationship(
+        'Instance',
+        secondary=user_instance_table,
     )
-    containers = association_proxy(
-        '_containers',
+    instances = association_proxy(
+        '_instances',
         'id',
-        creator=_container_find
+        creator=_instance_find
     )
     _requests = db.relationship(
         'Request',
@@ -172,7 +172,7 @@ class User(db.Model):
         otp_secret=None,
         language=None,
         groups=None,
-        containers=None,
+        instances=None,
         requests=None
     ):
 
@@ -198,10 +198,10 @@ class User(db.Model):
             self.groups = [group for group in groups]
         elif groups and isinstance(groups, int):
             self.groups = [groups]
-        if containers and isinstance(containers, list):
-            self.containers = [container for container in containers]
-        elif containers and isinstance(containers, int):
-            self.containers = [containers]
+        if instances and isinstance(instances, list):
+            self.instances = [instance for instance in instances]
+        elif instances and isinstance(instances, int):
+            self.instances = [instances]
         if requests and isinstance(requests, list):
             self.requests = [req for req in requests]
         elif requests and isinstance(requests, int):
@@ -252,13 +252,13 @@ class User(db.Model):
         redis_store.delete('eotp:' + self.username)
         return pwd_context.verify(secret, r_hash)
 
-    def add_containers(self, *containers):
-        self.containers.extend(
-            [container for container in containers if container not in self.containers])
+    def add_instances(self, *instances):
+        self.instances.extend(
+            [instance for instance in instances if instance not in self.instances])
 
-    def remove_containers(self, *containers):
-        self.containers = [
-            container for container in self.containers if container not in containers]
+    def remove_instances(self, *instances):
+        self.instances = [
+            instance for instance in self.instances if instance not in instances]
 
     def __jsonapi__(self, group=None):
         _json = {
@@ -287,13 +287,13 @@ class User(db.Model):
 
         _json['relationships'] = {}
         _json['relationships']['groups'] = {}
-        _json['relationships']['containers'] = {}
+        _json['relationships']['instances'] = {}
         _json['relationships']['requests'] = {}
 
         _json['relationships']['groups'] = [
             group.__jsonapi__('flat') for group in self._groups]
-        _json['relationships']['containers'] = [
-            container.__jsonapi__('flat') for container in self._containers]
+        _json['relationships']['instances'] = [
+            instance.__jsonapi__('flat') for instance in self._instances]
         _json['relationships']['requests'] = [
             req.__jsonapi__('flat') for req in self._requests]
 
@@ -419,13 +419,13 @@ class Ability(db.Model):
         return '<Ability %r>' % self.id
 
 
-class Container(db.Model):
-    __tablename__ = 'containers'
+class Instance(db.Model):
+    __tablename__ = 'instances'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(255), unique=True)
     _users = db.relationship(
         'User',
-        secondary=user_container_table,
+        secondary=user_instance_table,
     )
     users = association_proxy(
         '_users',
@@ -448,7 +448,7 @@ class Container(db.Model):
 
     def __jsonapi__(self, group=None):
         _json = {
-            'type': 'containers',
+            'type': 'instances',
             'id': self.id,
             'name': self.name
         }
@@ -465,7 +465,7 @@ class Container(db.Model):
         return _json
 
     def __repr__(self):
-        return '<Container %r>' % self.id
+        return '<Instance %r>' % self.id
 
 
 class Request(db.Model):

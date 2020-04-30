@@ -29,7 +29,7 @@ class AbilityDoesntExist(Exception):
         return repr(self.value)
 
 
-class ContainerDoesntExist(Exception):
+class InstanceDoesntExist(Exception):
 
     def __init__(self, value):
         self.value = value

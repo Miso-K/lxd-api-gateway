@@ -23,33 +23,33 @@ def import_user():
             'User argument not passed')
 
 
-def populate_containers_table():
+def populate_instances_table():
     """
-    Search for new or deleted containers and update their status in local database
+    Search for new or deleted instances and update their status in local database
     """
 
     all = []
     try:
-        res = lxd_api_get('containers')
+        res = lxd_api_get('instances')
         for c in res.json()['metadata']:
-            all.append(c[16:])  # get container name from api url
+            all.append(c[15:])  # get instance name from api url
     except Exception as e:
         print(e)
 
-    current_containers_list = tuple(all)
-    database_containers_list = [str(i.name) for i in Container.query.all()]
+    current_instances_list = tuple(all)
+    database_instances_list = [str(i.name) for i in Instance.query.all()]
 
-    # Removing old containers from database
-    for ct in database_containers_list:
-        if not ct in current_containers_list:
-            container = Container.query.filter_by(name=ct).first()
-            db.session.delete(container)
+    # Removing old instances from database
+    for ct in database_instances_list:
+        if not ct in current_instances_list:
+            instance = Instance.query.filter_by(name=ct).first()
+            db.session.delete(instance)
 
-    # Adding new containers to database
-    for ct in current_containers_list:
-        if not ct in database_containers_list:
-            container = Container(name=ct)
-            db.session.add(container)
+    # Adding new instances to database
+    for ct in current_instances_list:
+        if not ct in database_instances_list:
+            instance = Instance(name=ct)
+            db.session.add(instance)
 
     db.session.commit()
 

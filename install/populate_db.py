@@ -55,33 +55,33 @@ def _run():
     ability = Ability(name='requests_delete')  # 21 #admin
     db.session.add(ability)
 
-    ability = Ability(name='containers_infos_all')  # 22
+    ability = Ability(name='instances_infos_all')  # 22
     db.session.add(ability)
-    ability = Ability(name='containers_create')  # 23 #admin/user
+    ability = Ability(name='instances_create')  # 23 #admin/user
     db.session.add(ability)
-    ability = Ability(name='containers_infos')  # 24
+    ability = Ability(name='instances_infos')  # 24
     db.session.add(ability)
-    ability = Ability(name='containers_update')  # 25 #admin/user
+    ability = Ability(name='instances_update')  # 25 #admin/user
     db.session.add(ability)
-    ability = Ability(name='containers_delete')  # 26 #admin/user
+    ability = Ability(name='instances_delete')  # 26 #admin/user
     db.session.add(ability)
-    ability = Ability(name='containers_console')  # 27
+    ability = Ability(name='instances_console')  # 27
     db.session.add(ability)
-    ability = Ability(name='containers_state_infos')  # 28
+    ability = Ability(name='instances_state_infos')  # 28
     db.session.add(ability)
-    ability = Ability(name='containers_state_update')  # 29
+    ability = Ability(name='instances_state_update')  # 29
     db.session.add(ability)
-    ability = Ability(name='containers_start')  # 30
+    ability = Ability(name='instances_start')  # 30
     db.session.add(ability)
-    ability = Ability(name='containers_freeze')  # 31
+    ability = Ability(name='instances_freeze')  # 31
     db.session.add(ability)
-    ability = Ability(name='containers_unfreeze')  # 32
+    ability = Ability(name='instances_unfreeze')  # 32
     db.session.add(ability)
-    ability = Ability(name='containers_stop')  # 33
+    ability = Ability(name='instances_stop')  # 33
     db.session.add(ability)
-    ability = Ability(name='containers_stop_force')  # 34
+    ability = Ability(name='instances_stop_force')  # 34
     db.session.add(ability)
-    ability = Ability(name='containers_restart')  # 35
+    ability = Ability(name='instances_restart')  # 35
     db.session.add(ability)
 
     ability = Ability(name='snapshots_infos_all')  # 36

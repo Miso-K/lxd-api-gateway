@@ -9,7 +9,28 @@ from email.mime.multipart import MIMEMultipart
 from email.utils import formatdate
 import json
 import urllib3
+from app import redis_store
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+
+def scheduler_redis_job():
+    print('Redis_job: updating data')
+    all = []
+    try:
+        res = lxd_api_get('instances')
+        for c in res.json()['metadata']:
+            all.append(c[15:])  # get instance name from api url
+    except Exception as e:
+        print(e)
+
+    if len(all) > 0:
+        for c in all:
+            res = lxd_api_get('instances/' + c)
+            #print(res.json())
+            redis_store.set('cts:' + c + ':info', json.dumps(res.json()['metadata']))
+
+            res_state = lxd_api_get('instances/' + c + '/state')
+            redis_store.set('cts:' + c + ':state', json.dumps(res_state.json()['metadata']))
 
 
 def get_config():
@@ -33,14 +54,14 @@ def get_config():
     return {'endpoint': endpoint, 'cert': cert, 'verify': verify}
 
 
-def cts_stats(containers):
+def cts_stats(instances, redis_store):
     """
-    Generate stats for user's all containers
-    :param containers:
-    :return: containers stats
+    Generate stats for user's all instances
+    :param instances:
+    :return: instances stats
     """
 
-    count = len(containers)
+    count = len(instances)
     count_running = 0
     cpus_count = 0
     cpus_usage = 0
@@ -53,9 +74,11 @@ def cts_stats(containers):
     disk_usage_count = 0
     price_count = 0
 
-    for ct in containers:
-        ec = lxd_api_get('containers/'+ct).json()['metadata']
-        #sc =lxd_api_get('containers/' + ct + '/state').json()['metadata']
+    for ct in instances:
+        # ec = lxd_api_get('instances/'+ct).json()['metadata']
+        # print('REDIS',ct,redis_store.get('cts:' + ct + ':info'))
+        ec = json.loads(redis_store.get('cts:' + ct + ':info'))
+        # sc =lxd_api_get('instances/' + ct + '/state').json()['metadata']
 
         if ec['status'] == "Running":
             count_running += 1
@@ -67,11 +90,11 @@ def cts_stats(containers):
             cpus = None
         if cpus:
             cpus_count += int(cpus)
-        #cpus_usage += int(sc['cpu']['usage'])
-        #processes_count += int(sc['processes'])
+        # cpus_usage += int(sc['cpu']['usage'])
+        # processes_count += int(sc['processes'])
         
         '''memory'''
-        #memory_current_count += int(sc['memory']['usage'])
+        # memory_current_count += int(sc['memory']['usage'])
         try:
             memory = ec['expanded_config']['limits.memory']
         except:
@@ -87,10 +110,10 @@ def cts_stats(containers):
             memory_count = '{0:.2f}'.format(memory_count)
 
         '''disk usage'''
-        #try:
-        #    disk_usage_count += int(cs['disk']['usage'])
-        #except AttributeError:
-        #    disk_usage_count = 0;
+        # try:
+        #     disk_usage_count += int(cs['disk']['usage'])
+        # except AttributeError:
+        #     disk_usage_count = 0;
 
         '''disk size'''
         try:
@@ -101,7 +124,7 @@ def cts_stats(containers):
         if disk:
             r = re.compile("([0-9]+)([a-zA-Z]+)")
             m = r.match(disk)
-            #print(m.group(1), m.group(2))
+            # print(m.group(1), m.group(2))
             b = convert_bytes(m.group(1), m.group(2))
             disk_count_bytes += + b
         if disk_count_bytes:
@@ -118,8 +141,8 @@ def cts_stats(containers):
     
     cts = {
         'type': 'stats',
-        'containers': {
-            'names': containers,
+        'instances': {
+            'names': instances,
             'count': count,
             'count_running': count_running
         },
@@ -140,7 +163,7 @@ def cts_stats(containers):
             'price_count': price_count
         }
     }
-    #print(cts)
+    # print(cts)
 
     return cts    
 
@@ -169,7 +192,7 @@ def convert_bytes(size, type):
     else: 
         bytes = size
 
-    #print(bytes)
+    # print(bytes)
     return bytes
 
 

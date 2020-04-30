@@ -6,7 +6,7 @@ from app import api
 
 _cts_stats_fields_get = api.model('CtsStats', {
     'type': fields.String(default='stats'),
-    'containers': fields.Nested(api.model('CtsContainers', {
+    'instances': fields.Nested(api.model('CtsInstances', {
         'names': fields.List(fields.String),
         'count': fields.Integer,
         'count_running': fields.Integer
