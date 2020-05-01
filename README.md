@@ -2,7 +2,7 @@ lxd-api-gateway
 
 RESTful API for LXD with USER access limitations
 
-Use it with [Dashboard](https://github.com/Miso-K/lxd-api-gateway)
+Use it with [Dashboard](https://github.com/Miso-K/lxdmanager-vue-dashboard)
 
 [![Python version](https://img.shields.io/badge/Python-3.7-blue.svg)](https://www.python.org/downloads/release/python-350/)
 
