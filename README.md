@@ -9,7 +9,19 @@ Use it with [Dashboard](https://github.com/Miso-K/lxdmanager-vue-dashboard)
 ---
 
 ## Installation
-### Clone
+
+For installation actual version of *lxdmanager-api-gateway* you can use *install.sh* script.
+
+``` bash
+# Download the script
+curl https://raw.githubusercontent.com/Miso-K/lxd-api-gateway/master/install.sh > install.sh
+# Set execution permissions
+chmod +x install.sh
+# Run script to install program
+./install.sh
+```
+
+### Manual installation
 ```shell
 git clone --recursive https://github.com/Miso-K/lxd-api-gateway
 ```
@@ -61,7 +73,6 @@ sudo lxc config set core.https_address [::]:8443
 sudo lxc config set core.https_allowed_origin "*.example.com"
 sudo lxc config set core.https_allowed_methods "GET, POST, PUT, DELETE, OPTIONS"
 sudo lxc config set core.https_allowed_headers "Content-Type"
-sudo lxc config set core.trust_password true
 sudo service lxd restart # sometimes is required
 ```
 
