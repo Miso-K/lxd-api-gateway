@@ -140,6 +140,7 @@ WantedBy=multi-user.target
 EOF
 '
 
+sudo chown ubuntu:ubuntu -R /home/ubuntu/lxd-api-gateway/
 sudo chmod 744 /home/ubuntu/lxd-api-gateway/startenv.sh
 sudo chmod 664 /etc/systemd/system/lxd-api-gateway.service
 sudo systemctl daemon-reload
