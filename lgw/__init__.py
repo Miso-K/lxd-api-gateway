@@ -27,10 +27,10 @@ def scheduler_redis_job():
         for c in all:
             res = lxd_api_get('instances/' + c)
             #print(res.json())
-            redis_store.set('cts:' + c + ':info', json.dumps(res.json()['metadata']))
+            redis_store.set('instances:' + c + ':info', json.dumps(res.json()['metadata']))
 
             res_state = lxd_api_get('instances/' + c + '/state')
-            redis_store.set('cts:' + c + ':state', json.dumps(res_state.json()['metadata']))
+            redis_store.set('instances:' + c + ':state', json.dumps(res_state.json()['metadata']))
 
 
 def get_config():
@@ -98,7 +98,7 @@ def cts_stats(instances, redis_store):
         try:
             memory = ec['expanded_config']['limits.memory']
         except:
-            cpus = None
+            memory = None
         if memory:
             r = re.compile("([0-9]+)([a-zA-Z]+)")
             m = r.match(memory)

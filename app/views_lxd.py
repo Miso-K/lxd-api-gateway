@@ -37,8 +37,8 @@ class InstancesList(Resource):
                 instance_json = instance.__jsonapi__()
 
                 try:
-                    instance_json.update(json.loads(redis_store.get('cts:'+c.name+':info')))
-                    instance_json['state'] = (json.loads(redis_store.get('cts:' + c.name + ':state')))
+                    instance_json.update(json.loads(redis_store.get('instances:'+c.name+':info')))
+                    instance_json['state'] = (json.loads(redis_store.get('instances:' + c.name + ':state')))
                 except TypeError:
                     res = lgw.lxd_api_get('instances/' + c.name)
                     instance_json.update(res.json()['metadata'])
@@ -165,8 +165,8 @@ class Instances(Resource):
                 instance_json['state'] = res_state.json()['metadata']
 
                 # update redis data about instance
-                redis_store.set('cts:' + c.name + ':info', json.dumps(res.json()['metadata']))
-                redis_store.set('cts:' + c.name + ':state', json.dumps(res_state.json()['metadata']))
+                redis_store.set('instances:' + c.name + ':info', json.dumps(res.json()['metadata']))
+                redis_store.set('instances:' + c.name + ':state', json.dumps(res_state.json()['metadata']))
 
                 return {'data': instance_json}
             else:
@@ -220,8 +220,8 @@ class Instances(Resource):
                         api.abort(code=500, message='Can\'t create instance')
 
                 # Delete redis cache
-                redis_store.delete('cts:' + c.name + ':info')
-                redis_store.delete('cts:' + c.name + ':state')
+                redis_store.delete('instances:' + c.name + ':info')
+                redis_store.delete('instances:' + c.name + ':state')
 
             else:
                 api.abort(code=404, message='Instance doesn\'t exists')
@@ -265,8 +265,8 @@ class Instances(Resource):
                 return {}, 204
 
             # Delete redis cache
-            redis_store.delete('cts:' + c.name + ':info')
-            redis_store.delete('cts:' + c.name + ':state')
+            redis_store.delete('instances:' + c.name + ':info')
+            redis_store.delete('instances:' + c.name + ':state')
 
         else:
             api.abort(code=404, message='Instance not found')
@@ -315,8 +315,8 @@ class InstancesState(Resource):
                 res = lgw.lxd_api_put('instances/' + c.name + '/state', data)
 
                 # Delete redis cache
-                redis_store.delete('cts:' + c.name + ':info')
-                redis_store.delete('cts:' + c.name + ':state')
+                redis_store.delete('instances:' + c.name + ':info')
+                redis_store.delete('instances:' + c.name + ':state')
 
                 return {'data': res.json()}
             else:
@@ -354,8 +354,8 @@ class InstancesStart(Resource):
                 res = lgw.lxd_api_put('instances/' + c.name + '/state', data)
 
                 # Delete redis cache
-                redis_store.delete('cts:' + c.name + ':info')
-                redis_store.delete('cts:' + c.name + ':state')
+                redis_store.delete('instances:' + c.name + ':info')
+                redis_store.delete('instances:' + c.name + ':state')
 
                 return res.json()
             else:
@@ -392,8 +392,8 @@ class InstancesFreeze(Resource):
                 res = lgw.lxd_api_put('instances/' + c.name + '/state', data)
 
                 # Delete redis cache
-                redis_store.delete('cts:' + c.name + ':info')
-                redis_store.delete('cts:' + c.name + ':state')
+                redis_store.delete('instances:' + c.name + ':info')
+                redis_store.delete('instances:' + c.name + ':state')
 
                 return res.json()
             else:
@@ -430,8 +430,8 @@ class InstancesUnfreeze(Resource):
                 res = lgw.lxd_api_put('instances/' + c.name + '/state', data)
 
                 # Delete redis cache
-                redis_store.delete('cts:' + c.name + ':info')
-                redis_store.delete('cts:' + c.name + ':state')
+                redis_store.delete('instances:' + c.name + ':info')
+                redis_store.delete('instances:' + c.name + ':state')
 
                 return res.json()
             else:
@@ -468,8 +468,8 @@ class InstancesStop(Resource):
                 res = lgw.lxd_api_put('instances/' + c.name + '/state', data)
 
                 # Delete redis cache
-                redis_store.delete('cts:' + c.name + ':info')
-                redis_store.delete('cts:' + c.name + ':state')
+                redis_store.delete('instances:' + c.name + ':info')
+                redis_store.delete('instances:' + c.name + ':state')
 
                 return res.json()
             else:
@@ -507,8 +507,8 @@ class InstancesStopForce(Resource):
                 res = lgw.lxd_api_put('instances/' + c.name + '/state', data)
 
                 # Delete redis cache
-                redis_store.delete('cts:' + c.name + ':info')
-                redis_store.delete('cts:' + c.name + ':state')
+                redis_store.delete('instances:' + c.name + ':info')
+                redis_store.delete('instances:' + c.name + ':state')
 
                 return res.json()
             else:
@@ -545,8 +545,8 @@ class InstancesRestart(Resource):
                 res = lgw.lxd_api_put('instances/' + c.name + '/state', data)
 
                 # Delete redis cache
-                redis_store.delete('cts:' + c.name + ':info')
-                redis_store.delete('cts:' + c.name + ':state')
+                redis_store.delete('instances:' + c.name + ':info')
+                redis_store.delete('instances:' + c.name + ':state')
 
                 return res.json()
             else:
@@ -776,8 +776,6 @@ class ImagesList(Resource):
         :return: images data
         """
 
-        # current_identity = import_user()
-        # if current_identity.admin:
         res = lgw.lxd_api_get('images?recursion=1')
         return {'data': res.json()['metadata']}
 
@@ -904,7 +902,7 @@ class ImagesAliases(Resource):
         res = lgw.lxd_api_patch('images/aliases/' + alias, data=data)
         return res.json()['metadata']
 
-    @user_has('images_aliases_rename')
+    @user_has('images_aliases_update')
     def post(self, alias, d=None):
         """
         Rename image alias
