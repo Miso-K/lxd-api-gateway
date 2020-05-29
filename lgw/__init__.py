@@ -239,7 +239,6 @@ def send_request(subject, message, useremail=None):
             mailserver.ehlo()
             mailserver.login(config['smtp']['login'], config['smtp']['password'])
             try:
-                # mailserver.sendmail(sender, receivers, msg.as_string())
                 mailserver.send_message(msg, sender, receivers)
                 print("Successfully sent email")
                 return "Successfully sent email"

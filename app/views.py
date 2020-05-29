@@ -678,11 +678,26 @@ class RequestsList(Resource):
         usermail = req.__jsonapi__()['relationships']['users'][0]['email']
         atr = req.__jsonapi__()
 
-        mail_message = 'Username:' + username + \
-                       '/r/nAction: ' + str(atr['action']) + \
-                       '/r/nStatus: ' + str(atr['status']) + \
-                       '/r/nInfo: ' + str(atr['meta_data'])
+        details = ''
+        for key, value in atr['meta_data'].items():
+            details += str(key) + ': ' + str(value) + '<br>'
 
+        mail_message = """\
+                    <html>
+                      <head></head>
+                      <body>
+                        <p>Hi!<br>
+                           This email was send from LXDManager.<br><br>
+                           Request type: """ + str(atr['action']) + """<br>
+                           Status info: """ + str(atr['status']) + """.<br>
+                           <br>Request details:<br>
+                           """ + details + """
+                        </p>
+                      </body>
+                    </html>
+                    """
+
+        lgw.get_config()
         lgw.send_request(data['message'], mail_message, usermail)
         return {'data': req.__jsonapi__()}, 201
 
@@ -736,8 +751,28 @@ class Requests(Resource):
         username = req.__jsonapi__()['relationships']['users'][0]['username']
         usermail = req.__jsonapi__()['relationships']['users'][0]['email']
 
-        mail_message = 'User:' + username + '/r/nData: ' + str(
-            req.__jsonapi__())
+        #mail_message = 'User:' + username + '/r/nData: ' + str(
+        atr = req.__jsonapi__()
+
+        details = ''
+        for key, value in atr['meta_data'].items():
+            details += str(key) + ': ' + str(value) + '<br>'
+
+        mail_message = """\
+                            <html>
+                              <head></head>
+                              <body>
+                                <p>Hi!<br>
+                                   This email was send from LXDManager. <br><br>
+                                   Request type: """ + str(atr['action']) + """<br>
+                                   Status info: """ + str(atr['status']) + """.<br>
+                                   <br>Request details:<br>
+                                   """ + details + """
+                                </p>
+                              </body>
+                            </html>
+                            """
+
         lgw.send_request(data['message'], mail_message, usermail)
 
         return {'data': req.__jsonapi__()}
