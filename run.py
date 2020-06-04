@@ -24,7 +24,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 # The "apscheduler." prefix is hard coded
 scheduler = BackgroundScheduler(daemon=True)
-scheduler.add_job(scheduler_redis_job, 'interval', minutes=1)
+scheduler.add_job(scheduler_redis_job, 'interval', minutes=5)
 
 scheduler.start()
 

@@ -6,7 +6,7 @@ from app import api
 requests_fields_attributes = api.model('RequestsFieldsAttributes', {
     'action': fields.String,
     'message': fields.String,
-    'meta_data': fields.String,
+    'meta_data': fields.Raw,
     'status': fields.String,
     'created_on': fields.DateTime(dt_format='rfc822'),
     'changed_on': fields.DateTime(dt_format='rfc822')

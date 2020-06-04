@@ -62,47 +62,25 @@ class InstancesList(Resource):
         """
         Create instance based on POST data with image from linuxcontainers.org
 
-        Example:
-        data = {'name': 'vpsX', 'source': {'type': 'image', 'mode': 'pull',
-            'server': 'https://uk.images.linuxcontainers.org', 'protocol': 'simplestreams',
-            'alias': 'ubuntu/16.04'}, 'config': {'limits.cpu': '2', 'limits.memory': '256MB'}}
         :return: status code
         """
 
         current_identity = import_user()
         data = request.get_json()['data']
-        # print(data)
+        #print(data)
         
         if 'name' in data:
             c = Instance.query.filter_by(name=data['name']).first()
             if not c:
-                config = {'name': data['name'],
-                          # 'source': {'type': 'image',
-                          #           'mode': 'pull',
-                          #           'server': 'https://uk.images.linuxcontainers.org',
-                          #           'protocol': 'simplestreams',
-                          #           'alias': data['attributes']['source']['alias']},
-                          'source': data['source'],
-                          'profile': 'zfs',
-                          'config': {},
-                          # 'devices': {'root': {'path': '/', 'pool': 'zfs', 'type': 'disk', 'size': '3GB'}}
-                          }
-                          # 'devices': {'root': {'path': '/', 'pool': 'lxd','type': 'disk', 'size': '10GB'}}}
-                if 'limits_cpu' in data['config']:
-                    config['config']['limits.cpu'] = str(data['config']['limits_cpu'])
-                if 'limits_memory' in data['config']:
-                    config['config']['limits.memory'] = data['config']['limits_memory']
-                if 'price' in data['config']:
-                    config['config']['user.price'] = data['config']['price']
-                if 'pool_name' in data['config']:
-                    if data['config']['pool_name'] != '':
-                        config['devices'] = {'root': {'path': '/', 'pool': data['config']['pool_name'], 'type': 'disk'}}
-                        if 'limits_disk' in data['config']:
-                            config['devices']['root']['size'] = data['config']['limits_disk']
-
+                config = data['instance']
+                #if not admin, recalculate price
+                #if 'user.price' in config['config']:
+                #    config['config']['user.price'] = '5'
+                #print('Config2', config)
                 try:
                     res = lgw.lxd_api_post('instances', data=config)
-                    # print(res.text)
+                    print(res.text)
+                    print(res.status_code)
                 except Exception as e:
                     api.abort(code=500, message='Can\'t create instance')
 
@@ -218,6 +196,54 @@ class Instances(Resource):
                         # print(res.text)
                     except Exception as e:
                         api.abort(code=500, message='Can\'t create instance')
+
+                # Delete redis cache
+                redis_store.delete('instances:' + c.name + ':info')
+                redis_store.delete('instances:' + c.name + ':state')
+
+            else:
+                api.abort(code=404, message='Instance doesn\'t exists')
+        except:
+            api.abort(code=404, message='Instance doesn\'t exists')
+
+        return {'data': data}
+
+    @user_has('instances_update')
+    @api.expect(instances_fields_put, validate=True)
+    @api.marshal_with(instances_fields_put)
+    @api.doc(responses={
+        200: 'Instance config changed',
+        404: 'Instance doesn\'t exists',
+        500: 'Can\'t update instance config'
+    })
+    def patch(self, id, d=None):
+        """
+        Change instance name and config
+        # use patch instead of put to set only selected config
+        :param id:
+        :param d:
+        :return: instance data
+        """
+
+        if d:
+            data = d
+        else:
+            data = request.get_json()['data']
+
+        current_identity = import_user()
+
+        try:
+            c = Instance.query.get(id)
+            if c.name and (id in current_identity.instances or current_identity.admin):
+                config = data['instance']
+                try:
+                    res = lgw.lxd_api_patch('instances/' + c.name, data=config)
+                    print(res.text)
+                    print(res.status_code)
+                    if res.status_code == 500:
+                        api.abort(code=500, message='Can\'t create instance')
+                except Exception as e:
+                    api.abort(code=500, message='Can\'t create instance')
 
                 # Delete redis cache
                 redis_store.delete('instances:' + c.name + ':info')

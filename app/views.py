@@ -16,6 +16,7 @@ from .fields.lxdcerts import *
 import lgw
 import time
 import configparser
+import json
 
 
 class Auth(Resource):
@@ -712,6 +713,7 @@ class Requests(Resource):
         Get request
         """
         req = Request.query.get(id)
+        print(req.__jsonapi__())
 
         if not req:
             api.abort(code=404, message='Request not found')
@@ -908,6 +910,7 @@ class LXDConfig(Resource):
 
                 updateconf(Config, 'storage', 'enabled')
                 updateconf(Config, 'storage', 'pool_name')
+                updateconf(Config, 'storage', 'total_size')
 
             except Exception as e:
                 print('exception', e)
