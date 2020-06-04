@@ -25,7 +25,8 @@ _cts_stats_fields_get = api.model('CtsStats', {
         'disk_usage': fields.Float
     })),
     'price': fields.Nested(api.model('CtsPrice', {
-        'price_count': fields.Float
+        'price_count': fields.Integer,
+        'price_total': fields.Float
     }))
 })
 

@@ -73,6 +73,7 @@ def cts_stats(instances, redis_store):
     disk_count_bytes = 0
     disk_usage_count = 0
     price_count = 0
+    price_total = 0
 
     for ct in instances:
         # ec = lxd_api_get('instances/'+ct).json()['metadata']
@@ -137,7 +138,8 @@ def cts_stats(instances, redis_store):
         except:
             price = None
         if price:
-            price_count += float(price)
+            price_count += 1
+            price_total += float(price)
     
     cts = {
         'type': 'stats',
@@ -160,7 +162,8 @@ def cts_stats(instances, redis_store):
             'disk_usage': disk_usage_count
         },
         'price': {
-            'price_count': price_count
+            'price_count': price_count,
+            'price_total': price_total
         }
     }
     # print(cts)
