@@ -6,7 +6,7 @@ from lgw import scheduler_redis_job
 try:
     host = app.config['HOST']
 except KeyError:
-    host = '0.0.0.0'
+    host = '127.0.0.1'
 
 try:
     port = app.config['PORT']
