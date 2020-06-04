@@ -76,10 +76,10 @@ def cts_stats(instances, redis_store):
     price_total = 0
 
     for ct in instances:
-        # ec = lxd_api_get('instances/'+ct).json()['metadata']
-        # print('REDIS',ct,redis_store.get('cts:' + ct + ':info'))
-        ec = json.loads(redis_store.get('instances:' + ct + ':info'))
-        # sc =lxd_api_get('instances/' + ct + '/state').json()['metadata']
+        try:
+            ec = json.loads(redis_store.get('instances:' + ct + ':info'))
+        except TypeError:
+            ec = lxd_api_get('instances/' + ct + '/state').json()['metadata']
 
         if ec['status'] == "Running":
             count_running += 1
