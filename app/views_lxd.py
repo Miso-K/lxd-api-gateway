@@ -591,28 +591,24 @@ class InstancesExec(Resource):
         :param id
         :return terminal data
         """
-        # this part working for /exec api
         data = {
             'command': ['/bin/bash'],       # Command and arguments
             'environment': {},              # Optional extra environment variables to set
-            'wait-for-websocket': True,    # Whether to wait for a connection before starting the process
+            'wait-for-websocket': True,     # Whether to wait for a connection before starting the process
             'record-output': False,         # Whether to store stdout and stderr (only valid with wait-for-websocket=false) (requires API extension instance_exec_recording)
             'interactive': True,            # Whether to allocate a pts device instead of PIPEs
             'width': 80,                    # Initial width of the terminal (optional)
             'height': 25,                   # Initial height of the terminal (optional)
 
         }
-        # this part working for /console api
-        # data = {}
 
         current_identity = import_user()
         try:
             # c = Instance.query.filter_by(name=name).first()  # USE FOR QUERY BY NAME
             c = Instance.query.filter_by(id=id).first()
             if c and (c.id in current_identity.instances or current_identity.admin):
-                res = lgw.lxd_api_post('instances/' + c.name + '/console', {}) #'/exec', data
-                # return res.json()
-                # return {'data': {'type': 'terminal', 'id': id, 'attributes': res.json()}}, 201
+                #res = lgw.lxd_api_post('instances/' + c.name + '/console', {}) #bug with closing console
+                res = lgw.lxd_api_post('instances/' + c.name + '/exec', data)
                 return {'data': res.json()}
             else:
                 api.abort(code=403, message='Unauthorized access')
