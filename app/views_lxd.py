@@ -11,11 +11,13 @@ from .fields.hosts import *
 from app import redis_store
 import lgw
 import json
-import time
+# import time
 
 ##################
 # Instances API #
 ##################
+
+
 class InstancesList(Resource):
     decorators = [jwt_required, otp_confirmed]
 
@@ -30,7 +32,7 @@ class InstancesList(Resource):
         current_identity = import_user()
         instances = []
 
-        starttime = time.time()
+        # starttime = time.time()
         for c in Instance.query.all():
             instance = Instance.query.filter_by(name=c.name).first()
             if c.id in current_identity.instances or current_identity.admin:
@@ -47,7 +49,7 @@ class InstancesList(Resource):
 
                 instances.append(instance_json)
 
-        #print('time: ', time.time() - starttime)
+        # print('time: ', time.time() - starttime)
         return {'data': instances}
 
     @user_has('instances_create')
@@ -67,16 +69,16 @@ class InstancesList(Resource):
 
         current_identity = import_user()
         data = request.get_json()['data']
-        #print(data)
+        # print(data)
         
         if 'name' in data:
             c = Instance.query.filter_by(name=data['name']).first()
             if not c:
                 config = data['instance']
-                #if not admin, recalculate price
-                #if 'user.price' in config['config']:
+                # if not admin, recalculate price
+                # if 'user.price' in config['config']:
                 #    config['config']['user.price'] = '5'
-                #print('Config2', config)
+                # print('Config2', config)
                 try:
                     res = lgw.lxd_api_post('instances', data=config)
                     print(res.text)
@@ -151,7 +153,6 @@ class Instances(Resource):
                 api.abort(code=403, message='Unauthorized access')
         except KeyError:
             api.abort(code=404, message='Instance doesn\'t exists')
-
 
     @user_has('instances_update')
     @api.expect(instances_fields_put, validate=True)
@@ -812,11 +813,11 @@ class ImagesList(Resource):
         if current_identity.admin:
             res = lgw.lxd_api_post('images', data=data)
             # **** wait for operation ****
-            print(res.json()['operation'])
-            op_id = (res.json()['metadata']['id'])
+            # print(res.json()['operation'])
+            # op_id = (res.json()['metadata']['id'])
             # res2 = lgw.lxd_api_get('/operations/' + op_id + '/wait')
             # print(res2.json())
-            print(res.json())
+            # print(res.json())
             return res.json()
 
     @user_has('images_aliases_delete') # ???????????????????????????????????????????????????????????????????
@@ -882,7 +883,6 @@ class ImagesAliasesList(Resource):
         else:
             data = request.get_json()['data']
 
-        # print(data)
         res = lgw.lxd_api_post('images/aliases', data=data)
         return res.json()['metadata']
 
@@ -978,7 +978,6 @@ class Operations(Resource):
         Get images list
         :return: images data
         """
-
         res = lgw.lxd_api_get('operations/' + id + '/wait')
         return res.json()
 
@@ -993,9 +992,7 @@ class LxcHostResources(Resource):
         Get lxd host resources
         :return data
         """
-
         json_output = lgw.lxd_api_get('resources').json()['metadata']
-        # return {'data': {'attributes': json_output}}
         return {'data': json_output}
 
 
@@ -1009,7 +1006,6 @@ class LxcCheckConfig(Resource):
         :return data
         """
         conf = lgw.lxd_api_get_config().json()['metadata']
-        # return {'data': {'attributes': conf, 'type': 'checkconfig', 'id': 0 }}
         return {'data': conf}
 
         
@@ -1038,8 +1034,6 @@ class CtsStats(Resource):
             if instance.id in current_identity.instances or current_identity.admin:
                 alist.append(ct)
 
-        start_time = time.time()
         json_output = lgw.cts_stats(alist, redis_store)
-        #print('time stats: ', time.time() - start_time)
         return {'data': json_output}
 
