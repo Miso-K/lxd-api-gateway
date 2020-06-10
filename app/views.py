@@ -33,6 +33,8 @@ class Auth(Resource):
         username = request_data['username']
         password = request_data['password']
 
+        user_ip = request.environ.get('HTTP_X_REAL_IP', request.remote_addr)
+
         user = User.query.filter_by(username=username).first()
 
         if not user or not user.verify_password(password):
@@ -50,7 +52,7 @@ class Auth(Resource):
             access_token = create_access_token(identity=user, fresh=False)
             ret = {'access_token': access_token}
             access_jti = get_jti(encoded_token=access_token)
-            redis_store.set('access_jti:' + access_jti, 'false', app.config['OTP_ACCESS_TOKEN_EXPIRES'])
+            redis_store.set('access_jti:' + user_ip + access_jti, 'false', app.config['OTP_ACCESS_TOKEN_EXPIRES'])
             # print(redis_store.get(access_jti) + ' ' + access_jti)
             return ret
 
@@ -58,8 +60,8 @@ class Auth(Resource):
         refresh_token = create_refresh_token(identity=user)
         access_jti = get_jti(encoded_token=access_token)
         refresh_jti = get_jti(encoded_token=refresh_token)
-        redis_store.set('access_jti:' + access_jti, 'false', app.config['ACCESS_TOKEN_EXPIRES'])
-        redis_store.set('refresh_jti:' + refresh_jti, 'false', app.config['REFRESH_TOKEN_EXPIRES'])
+        redis_store.set('access_jti:' + user_ip + access_jti, 'false', app.config['ACCESS_TOKEN_EXPIRES'])
+        redis_store.set('refresh_jti:' + user_ip + refresh_jti, 'false', app.config['REFRESH_TOKEN_EXPIRES'])
         ret = {'access_token': access_token,
                'refresh_token': refresh_token}
         return ret
@@ -81,9 +83,11 @@ class AuthOtp(Resource):
         # print(secret)
         user = import_user()
 
+        user_ip = request.environ.get('HTTP_X_REAL_IP', request.remote_addr)
+
         # revoke otp_access_token
         jti = get_raw_jwt()['jti']
-        redis_store.set('access_jti:' + jti, 'true', app.config['OTP_ACCESS_TOKEN_EXPIRES'])
+        redis_store.set('access_jti:' + user_ip + jti, 'true', app.config['OTP_ACCESS_TOKEN_EXPIRES'])
 
         if user.get_otp_type() == 'totp':
             if not user.verify_totp(secret):
@@ -100,8 +104,8 @@ class AuthOtp(Resource):
         refresh_token = create_refresh_token(identity=user)
         access_jti = get_jti(encoded_token=access_token)
         refresh_jti = get_jti(encoded_token=refresh_token)
-        redis_store.set('access_jti:' + access_jti, 'false', app.config['ACCESS_TOKEN_EXPIRES'])
-        redis_store.set('refresh_jti:' + refresh_jti, 'false', app.config['REFRESH_TOKEN_EXPIRES'])
+        redis_store.set('access_jti:' + user_ip + access_jti, 'false', app.config['ACCESS_TOKEN_EXPIRES'])
+        redis_store.set('refresh_jti:' + user_ip + refresh_jti, 'false', app.config['REFRESH_TOKEN_EXPIRES'])
         ret = {'access_token': access_token,
                'refresh_token': refresh_token}
         return ret
@@ -117,10 +121,11 @@ class AuthRefresh(Resource):
         :return new access_token
         """
         user = import_user()
+        user_ip = request.environ.get('HTTP_X_REAL_IP', request.remote_addr)
         user.otp_confirmed = True
         access_token = create_access_token(identity=user, fresh=False)
         access_jti = get_jti(encoded_token=access_token)
-        redis_store.set('access_jti:' + access_jti, 'false', app.config['ACCESS_TOKEN_EXPIRES'])
+        redis_store.set('access_jti:' + user_ip + access_jti, 'false', app.config['ACCESS_TOKEN_EXPIRES'])
         ret = {
             'access_token': access_token
         }
@@ -151,9 +156,10 @@ class AuthLogout(Resource):
         Revoke token
         """
         jti = get_raw_jwt()['jti']
+        user_ip = request.environ.get('HTTP_X_REAL_IP', request.remote_addr)
         if not jti:
             api.abort(code=404, message='Token not found')
-        redis_store.set('access_jti:' + jti, 'true', app.config['ACCESS_TOKEN_EXPIRES'])
+        redis_store.set('access_jti:' + user_ip + jti, 'true', app.config['ACCESS_TOKEN_EXPIRES'])
         return {"msg": "Access token revoked"}, 200
 
 

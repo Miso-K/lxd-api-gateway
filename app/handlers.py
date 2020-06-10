@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 from app import app, jwt, db, api, redis_store
+from flask import request
 # from flask import jsonify
 # from .models import User, Container
 # from .decorators import import_user
@@ -41,9 +42,10 @@ def check_if_token_is_revoked(decrypted_token):
     created tokens to our store with a revoked status of 'false'). In this case
     we will consider the token to be revoked, for safety purposes.
     """
+    user_ip = request.environ.get('HTTP_X_REAL_IP', request.remote_addr)
     jti = decrypted_token['jti']
-    entry = redis_store.get('access_jti:' + jti)
-    entry_refresh = redis_store.get('refresh_jti:' + jti)
+    entry = redis_store.get('access_jti:' + user_ip + jti)
+    entry_refresh = redis_store.get('refresh_jti:' + user_ip + jti)
     # print(str(entry) + ' ' + str(jti))
     if entry is None and entry_refresh is None:
         return True
