@@ -381,7 +381,7 @@ class Me(Resource):
             user.ic_dph = data['ic_dph']
         if 'dic' in data:
             user.dic = data['dic']
-        if 'langugage' in data:
+        if 'language' in data:
             user.language = data['language']
         if 'otp_type' in data:
             if data['otp_type'] == 'none':

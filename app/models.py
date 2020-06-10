@@ -123,7 +123,7 @@ class User(db.Model):
     password = db.Column(db.String(100), nullable=False)
     otp_type = db.Column(db.String(10))
     otp_secret = db.Column(db.String(20))
-    language = db.Column(db.String(20), default='English')
+    language = db.Column(db.String(20), default='en')
     _groups = db.relationship(
         'Group',
         secondary=user_group_table
