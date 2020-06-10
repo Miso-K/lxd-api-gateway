@@ -661,7 +661,7 @@ class RequestsList(Resource):
         Create request
         """
         data = request.get_json()['data']
-        print(data)
+        #print(data)
 
         req = Request(message=data['message'])
         req.action = data['action']
@@ -690,20 +690,14 @@ class RequestsList(Resource):
             details += str(key) + ': ' + str(value) + '<br>'
 
         mail_message = """\
-                    <html>
-                      <head></head>
-                      <body>
-                        <p>Hi!<br>
-                           This email was send from LXDManager.<br><br>
-                           Request type: """ + str(atr['action']) + """<br>
-                           Status info: """ + str(atr['status']) + """.<br>
-                           <br>Request details:<br>
-                           """ + details + """
-                        </p>
-                      </body>
-                    </html>
-                    """
-
+                            <html>
+                              <head></head>
+                              <body>
+                                """ + data['mail_message'] + """
+                              </body>
+                            </html>
+                            """
+        #print(mail_message)
         lgw.get_config()
         lgw.send_request(data['message'], mail_message, usermail)
         return {'data': req.__jsonapi__()}, 201
@@ -770,13 +764,7 @@ class Requests(Resource):
                             <html>
                               <head></head>
                               <body>
-                                <p>Hi!<br>
-                                   This email was send from LXDManager. <br><br>
-                                   Request type: """ + str(atr['action']) + """<br>
-                                   Status info: """ + str(atr['status']) + """.<br>
-                                   <br>Request details:<br>
-                                   """ + details + """
-                                </p>
+                                """ + data['mail_message'] + """
                               </body>
                             </html>
                             """
