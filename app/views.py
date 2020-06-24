@@ -274,6 +274,7 @@ class Users(Resource):
             api.abort(code=404, message='User not found')
 
         data = request.get_json()['data']
+        #print(data)
 
         if 'admin' in data and current_identity.admin:
             user.admin = data['admin']
@@ -905,6 +906,11 @@ class LXDConfig(Resource):
                 updateconf(Config, 'storage', 'enabled')
                 updateconf(Config, 'storage', 'pool_name')
                 updateconf(Config, 'storage', 'total_size')
+                updateconf(Config, 'storage', 'limits_unit')
+                updateconf(Config, 'storage', 'limits_unit_show')
+
+                updateconf(Config, 'memory', 'limits_unit')
+                updateconf(Config, 'memory', 'limits_unit_show')
 
             except Exception as e:
                 print('exception', e)

@@ -18,7 +18,7 @@ password =
 production_name = LXDmanager.com
 
 [price]
-enabled = False
+enabled = True
 cpu = 1
 memory = 0.01
 disk = 0.1
@@ -29,5 +29,12 @@ discount_year = 1
 discount_years = 1
 
 [storage]
-enabled = False
-pool_name = lxd
+enabled = True
+pool_name = default
+total_size = 1000 GB
+limits_unit = GB
+limits_unit_show = GB
+
+[memory]
+limits_unit = MB
+limits_unit_show = MB

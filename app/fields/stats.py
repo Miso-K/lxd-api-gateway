@@ -18,10 +18,12 @@ _cts_stats_fields_get = api.model('CtsStats', {
     })),
     'memory': fields.Nested(api.model('CtsMemory', {
         'memory_count': fields.String,
+        'memory_count_bytes': fields.Float,
         'memory_current_count': fields.Float
     })),
     'disk': fields.Nested(api.model('CtsDisk', {
         'disk_count': fields.Float,
+        'disk_count_bytes': fields.Float,
         'disk_usage': fields.Float
     })),
     'price': fields.Nested(api.model('CtsPrice', {

@@ -155,10 +155,12 @@ def cts_stats(instances, redis_store):
         },
         'memory': {
             'memory_count': memory_count,
+            'memory_count_bytes': memory_count_bytes,
             'memory_current_count': memory_current_count
         },
         'disk': {
             'disk_count': disk_count,
+            'disk_count_bytes': disk_count_bytes,
             'disk_usage': disk_usage_count
         },
         'price': {
