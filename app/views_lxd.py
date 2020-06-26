@@ -792,7 +792,6 @@ class ImagesList(Resource):
     decorators = [jwt_required, otp_confirmed]
 
     @user_has('images_infos_all')
-    # @api.marshal_with(instances_fields_get_many)
     def get(self):
         """
         Get images list
@@ -808,19 +807,12 @@ class ImagesList(Resource):
         create image
         """
         data = request.get_json()['data']
-        # print(data)
         current_identity = import_user()
         if current_identity.admin:
             res = lgw.lxd_api_post('images', data=data)
-            # **** wait for operation ****
-            # print(res.json()['operation'])
-            # op_id = (res.json()['metadata']['id'])
-            # res2 = lgw.lxd_api_get('/operations/' + op_id + '/wait')
-            # print(res2.json())
-            # print(res.json())
             return res.json()
 
-    @user_has('images_aliases_delete') # ???????????????????????????????????????????????????????????????????
+    @user_has('images_aliases_delete') # ?
     def delete(self, alias):
         """
         Delete alias
@@ -950,7 +942,6 @@ class RemoteImagesList(Resource):
     decorators = [jwt_required, otp_confirmed]
 
     @user_has('images_remote_infos_all')
-    # @api.marshal_with(instances_fields_get_many)
     def get(self):
         """
         Get images list
@@ -959,10 +950,212 @@ class RemoteImagesList(Resource):
 
         current_identity = import_user()
         if current_identity.admin:
-            # res = lgw.lxd_api_get('images?recursion=1')
             res = lgw.lxd_remote_get()
             # res = requests.get('https://uk.images.linuxinstances.org' + '/1.0/images/aliases', timeout=10)
             return {'data': res.json()['metadata']}
+
+
+##################
+# Networks API #
+##################
+class NetworksList(Resource):
+    decorators = [jwt_required, otp_confirmed]
+
+    @user_has('networks_infos_all')
+    def get(self):
+        """
+        Get networks list
+        :return: networks data
+        """
+
+        res = lgw.lxd_api_get('networks?recursion=1')
+        return {'data': res.json()['metadata']}
+
+    @user_has('networks_create')
+    def post(self):
+        """
+        create image
+        """
+        data = request.get_json()['data']
+        current_identity = import_user()
+        if current_identity.admin:
+            res = lgw.lxd_api_post('networks', data=data)
+            return res.json()
+
+
+##################
+# Profiles API #
+##################
+class ProfilesList(Resource):
+    decorators = [jwt_required, otp_confirmed]
+
+    @user_has('profiles_infos_all')
+    def get(self):
+        """
+        Get profiles list
+        :return: profiles data
+        """
+
+        res = lgw.lxd_api_get('profiles?recursion=1')
+        return {'data': res.json()['metadata']}
+
+    @user_has('profiles_create')
+    def post(self):
+        """
+        Create profile
+        """
+        data = request.get_json()['data']
+        current_identity = import_user()
+        if current_identity.admin:
+            res = lgw.lxd_api_post('profiles', data=data)
+            return res.json()
+
+
+class Profiles(Resource):
+    decorators = [jwt_required, otp_confirmed]
+
+    @user_has('profiles_infos')
+    def get(self, name):
+        """
+        :return
+        """
+        res = lgw.lxd_api_get('profiles/' + name)
+        return {'data': res.json()['metadata']}
+
+    @user_has('profiles_update')
+    def put(self, name, d=None):
+        """
+        Update profile
+        """
+        if d:
+            data = d
+        else:
+            data = request.get_json()['data']
+
+        res = lgw.lxd_api_put('profiles/' + name, data=data)
+        return res.json()['metadata']
+
+    @user_has('profiles_update')
+    def patch(self, name, d=None):
+        """
+        Update profile
+        """
+        if d:
+            data = d
+        else:
+            data = request.get_json()['data']
+
+        res = lgw.lxd_api_patch('profiles/' + name, data=data)
+        return res.json()['metadata']
+
+    @user_has('profiles_update')
+    def post(self, name, d=None):
+        """
+        Rename profile
+        """
+        if d:
+            data = d
+        else:
+            data = request.get_json()['data']
+
+        res = lgw.lxd_api_post('profiles/' + name, data=data)
+        return res.json()['metadata']
+
+    @user_has('profiles_delete')
+    def delete(self, name):
+        """
+        Delete profile
+        """
+        res = lgw.lxd_api_delete('profiles/' + name)
+        return res.json()['metadata']
+
+
+##################
+# Projects API #
+##################
+class ProjectsList(Resource):
+    decorators = [jwt_required, otp_confirmed]
+
+    @user_has('projects_infos_all')
+    def get(self):
+        """
+        Get projects list
+        :return: projects data
+        """
+
+        res = lgw.lxd_api_get('projects?recursion=1')
+        return {'data': res.json()['metadata']}
+
+    @user_has('projects_create')
+    def post(self):
+        """
+        Create project
+        """
+        data = request.get_json()['data']
+        print(data)
+        current_identity = import_user()
+        if current_identity.admin:
+            res = lgw.lxd_api_post('projects', data=data)
+            return res.json()
+
+
+class Projects(Resource):
+    decorators = [jwt_required, otp_confirmed]
+
+    @user_has('projects_infos')
+    def get(self, name):
+        """
+        :return
+        """
+        res = lgw.lxd_api_get('projects/' + name)
+        return {'data': res.json()['metadata']}
+
+    @user_has('projects_update')
+    def put(self, name, d=None):
+        """
+        Update project
+        """
+        if d:
+            data = d
+        else:
+            data = request.get_json()['data']
+
+        res = lgw.lxd_api_put('projects/' + name, data=data)
+        return res.json()['metadata']
+
+    @user_has('projects_update')
+    def patch(self, name, d=None):
+        """
+        Update project
+        """
+        if d:
+            data = d
+        else:
+            data = request.get_json()['data']
+
+        res = lgw.lxd_api_patch('projects/' + name, data=data)
+        return res.json()['metadata']
+
+    @user_has('projects_update')
+    def post(self, name, d=None):
+        """
+        Rename project
+        """
+        if d:
+            data = d
+        else:
+            data = request.get_json()['data']
+
+        res = lgw.lxd_api_post('projects/' + name, data=data)
+        return res.json()['metadata']
+
+    @user_has('projects_delete')
+    def delete(self, name):
+        """
+        Delete project
+        """
+        res = lgw.lxd_api_delete('projects/' + name)
+        return res.json()['metadata']
 
 
 ##################
@@ -985,7 +1178,6 @@ class Operations(Resource):
 class LxcHostResources(Resource):
     decorators = [jwt_required, otp_confirmed]
 
-    # @api.marshal_with(cts_hosts_fields_get)
     @user_has('resources_infos')
     def get(self):
         """

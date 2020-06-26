@@ -53,3 +53,14 @@ nslxc.add_resource(Images, '/images/<string:fingerprint>')
 nslxc.add_resource(ImagesAliasesList, '/images/aliases')
 nslxc.add_resource(ImagesAliases, '/images/aliases/<path:alias>')
 nslxc.add_resource(RemoteImagesList, '/images/remote')
+
+# Networks routes
+nslxc.add_resource(NetworksList, '/networks')
+
+# Profiles routes
+nslxc.add_resource(ProfilesList, '/profiles')
+nslxc.add_resource(Profiles, '/profiles/<string:name>')
+
+# Projects routes
+nslxc.add_resource(ProjectsList, '/projects')
+nslxc.add_resource(Projects, '/projects/<string:name>')
