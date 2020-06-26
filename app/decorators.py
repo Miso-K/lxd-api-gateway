@@ -71,7 +71,7 @@ def user_has(ability, get_user=import_user):
             current_identity = get_user()
             for group in current_identity._groups:
                 user_abilities += group.abilities
-            if desired_ability.id in user_abilities or current_identity.admin:
+            if current_identity.admin or desired_ability.id in user_abilities:
                 return func(*args, **kwargs)
             else:
                 raise Forbidden("You do not have access")
