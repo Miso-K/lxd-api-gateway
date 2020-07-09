@@ -32,9 +32,20 @@ discount_years = 1
 enabled = True
 pool_name = default
 total_size = 1000 GB
-limits_unit = GB
-limits_unit_show = GB
+limits_unit = GiB
+limits_unit_show = GiB
+limits_min = 5
+limits_max = 200
+limits_step = 5
 
 [memory]
-limits_unit = MB
-limits_unit_show = MB
+limits_unit = MiB
+limits_unit_show = MiB
+limits_min = 512
+limits_max = 8192
+limits_step = 512
+
+[cpu]
+limits_min = 1
+limits_max = 8
+limits_step = 1
