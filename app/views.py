@@ -908,9 +908,19 @@ class LXDConfig(Resource):
                 updateconf(Config, 'storage', 'total_size')
                 updateconf(Config, 'storage', 'limits_unit')
                 updateconf(Config, 'storage', 'limits_unit_show')
+                updateconf(Config, 'storage', 'limits_min')
+                updateconf(Config, 'storage', 'limits_max')
+                updateconf(Config, 'storage', 'limits_step')
 
                 updateconf(Config, 'memory', 'limits_unit')
                 updateconf(Config, 'memory', 'limits_unit_show')
+                updateconf(Config, 'memory', 'limits_min')
+                updateconf(Config, 'memory', 'limits_max')
+                updateconf(Config, 'memory', 'limits_step')
+
+                updateconf(Config, 'cpu', 'limits_min')
+                updateconf(Config, 'cpu', 'limits_max')
+                updateconf(Config, 'cpu', 'limits_step')
 
             except Exception as e:
                 print('exception', e)
