@@ -21,14 +21,17 @@ except KeyError:
 
 
 from apscheduler.schedulers.background import BackgroundScheduler
+import atexit
 
 # The "apscheduler." prefix is hard coded
 scheduler = BackgroundScheduler(daemon=True)
-scheduler.add_job(scheduler_redis_job, 'interval', minutes=5)
+scheduler.add_job(scheduler_redis_job, 'interval', minutes=1)
 
 scheduler.start()
 
 if ssl:
-	app.run(host=host, port=port, threaded=True, ssl_context=(app.config['SSL_CERT'], app.config['SSL_KEY']), debug=True)
+	app.run(host=host, port=port, threaded=True, ssl_context=(app.config['SSL_CERT'], app.config['SSL_KEY']), debug=False)
 else:
-	app.run(host=host, port=port, threaded=True, debug=True)
+	app.run(host=host, port=port, threaded=True, debug=False)
+
+atexit.register(lambda: scheduler.shutdown(wait=False))
