@@ -89,8 +89,12 @@ instances_fields_attributes_put = api.model('InstancesFieldsAttributesPut', {
 instances_fields_with_relationships_post_put = api.model('InstancesFieldsWithRelationshipsPost', {
     'relationships': fields.Nested(api.model('InstancesRelationshipsPost', {
         'users': fields.Nested(api.model('InstancesDataPost', {
-            'type': fields.String(default='users'),
-            'id': fields.Integer
+            'id': fields.Integer,
+            'name': fields.String()
+        }), as_list=True),
+        'servers': fields.Nested(api.model('InstancesDataPost', {
+            'id': fields.Integer,
+            'name': fields.String()
         }), as_list=True)
     }))
 })

@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-import re
 import requests
 import configparser
 import smtplib
@@ -9,28 +8,37 @@ from email.mime.multipart import MIMEMultipart
 from email.utils import formatdate
 import json
 import urllib3
-from app import redis_store
+from app import redis_store, logger
+import logging
+from OpenSSL import crypto
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 def scheduler_redis_job():
-    print('Redis_job: updating data')
-    all = []
-    try:
-        res = lxd_api_get('instances')
-        for c in res.json()['metadata']:
-            all.append(c[15:])  # get instance name from api url
-    except Exception as e:
-        print(e)
+    #print('Redis_job: updating data in redis DB')
+    logger.info('Redis_job: updating data in redis DB')
 
-    if len(all) > 0:
-        for c in all:
-            res = lxd_api_get('instances/' + c)
-            #print(res.json())
-            redis_store.set('instances:' + c + ':info', json.dumps(res.json()['metadata']))
+    database_lxdservers_list = redis_store.keys('servers:*')
+    #print(database_lxdservers_list)
 
-            res_state = lxd_api_get('instances/' + c + '/state')
-            redis_store.set('instances:' + c + ':state', json.dumps(res_state.json()['metadata']))
+    for serverkey in database_lxdservers_list:
+        lxdserver = json.loads(redis_store.get(serverkey))
+        all = []
+        try:
+            res = lxd_api_get_scheduler(lxdserver, 'instances')
+            for c in res.json()['metadata']:
+                all.append(c[15:])  # get instance name from api url
+        except Exception as e:
+            print(e)
+        #print(all)
+        if len(all) > 0:
+            for c in all:
+                res = lxd_api_get_scheduler(lxdserver, 'instances/' + c)
+                redis_store.set('server:' + lxdserver['name'] + ':instance:' + c + ':info', json.dumps(res.json()['metadata']))
+                # print(res.json()['metadata'])
+
+                res_state = lxd_api_get_scheduler(lxdserver, 'instances/' + c + '/state')
+                redis_store.set('server:' + lxdserver['name'] + ':instance:' + c + ':state', json.dumps(res_state.json()['metadata']))
 
 
 def get_config():
@@ -52,153 +60,6 @@ def get_config():
         # print("Wrong config.conf file.")
         print("")
     return {'endpoint': endpoint, 'cert': cert, 'verify': verify}
-
-
-def cts_stats(instances, redis_store):
-    """
-    Generate stats for user's all instances
-    :param instances:
-    :return: instances stats
-    """
-
-    count = len(instances)
-    count_running = 0
-    cpus_count = 0
-    cpus_usage = 0
-    processes_count = 0
-    memory_count = 0
-    memory_count_bytes = 0
-    memory_current_count = 0
-    disk_count = 0
-    disk_count_bytes = 0
-    disk_usage_count = 0
-    price_count = 0
-    price_total = 0
-
-    for ct in instances:
-        try:
-            ec = json.loads(redis_store.get('instances:' + ct + ':info'))
-        except TypeError:
-            ec = lxd_api_get('instances/' + ct + '/state').json()['metadata']
-
-        if ec['status'] == "Running":
-            count_running += 1
-
-        '''cpus'''
-        try:
-            cpus = ec['expanded_config']['limits.cpu']
-        except:
-            cpus = None
-        if cpus:
-            cpus_count += int(cpus)
-        # cpus_usage += int(sc['cpu']['usage'])
-        # processes_count += int(sc['processes'])
-        
-        '''memory'''
-        # memory_current_count += int(sc['memory']['usage'])
-        try:
-            memory = ec['expanded_config']['limits.memory']
-        except:
-            memory = None
-        if memory:
-            r = re.compile("([0-9]+)([a-zA-Z]+)")
-            m = r.match(memory)
-            b = convert_bytes(m.group(1), m.group(2))
-            memory_count_bytes += b
-
-        if memory_count_bytes:
-            memory_count = memory_count_bytes / (1000 * 1000 * 1000)
-            memory_count = '{0:.2f}'.format(memory_count)
-
-        '''disk usage'''
-        # try:
-        #     disk_usage_count += int(cs['disk']['usage'])
-        # except AttributeError:
-        #     disk_usage_count = 0;
-
-        '''disk size'''
-        try:
-            disk = ec['expanded_devices']['root']['size']
-        except:
-            disk = None
-
-        if disk:
-            r = re.compile("([0-9]+)([a-zA-Z]+)")
-            m = r.match(disk)
-            # print(m.group(1), m.group(2))
-            b = convert_bytes(m.group(1), m.group(2))
-            disk_count_bytes += + b
-        if disk_count_bytes:
-            disk_count = disk_count_bytes / (1000 * 1000 * 1000)
-            disk_count = '{0:.2f}'.format(disk_count)
-
-        '''price'''
-        try:
-            price = ec['expanded_config']['user.price']
-        except:
-            price = None
-        if price:
-            price_count += 1
-            price_total += float(price)
-    
-    cts = {
-        'type': 'stats',
-        'instances': {
-            'names': instances,
-            'count': count,
-            'count_running': count_running
-        },
-        'cpus': {
-            'cpus_count': cpus_count,
-            'cpus_usage': cpus_usage,
-            'processes_count': processes_count
-        },
-        'memory': {
-            'memory_count': memory_count,
-            'memory_count_bytes': memory_count_bytes,
-            'memory_current_count': memory_current_count
-        },
-        'disk': {
-            'disk_count': disk_count,
-            'disk_count_bytes': disk_count_bytes,
-            'disk_usage': disk_usage_count
-        },
-        'price': {
-            'price_count': price_count,
-            'price_total': price_total
-        }
-    }
-    # print(cts)
-
-    return cts    
-
-   
-def convert_bytes(size, type):
-    """
-    Returns B converted from KB/MB/GB
-    :param size:
-    :param type:
-    :return:
-    """
-
-    bytes = 0
-    if type == 'KB':
-        bytes = int(size) * 1000
-    if type == 'KiB':
-        bytes = int(size) * 1024
-    elif type == 'MB':
-        bytes = int(size) * 1000 * 1000
-    elif type == 'MiB':
-        bytes = int(size) * 1024 * 1024
-    elif type == 'GB':
-        bytes = int(size) * 1000 * 1000 * 1000
-    elif type == 'GiB':
-        bytes = int(size) * 1024 * 1024 * 1024
-    else: 
-        bytes = size
-
-    # print(bytes)
-    return bytes
 
 
 def send_request(subject, message, useremail=None):
@@ -303,78 +164,103 @@ def send_otp_email(key, useremail=None):
             return "Error: unable to send email"
 
 
-def lxd_api_get(endpoint):
+def lxd_api_get_scheduler(server, endpoint):
     """
     Get function for LXD API
     :param endpoint:
     :return: response:
     """
-
-    r = requests.get(get_config()['endpoint'] + '/1.0/' + endpoint + '', verify=get_config()['verify'], cert=get_config()['cert'], timeout=100)
+    cert = ('certs/' + server['key_public'], 'certs/' + server['key_private'])
+    r = requests.get(server['address'] + '/1.0/' + endpoint + '', verify=get_config()['verify'], cert=cert, timeout=100)
     #print(r.text)
     return r
 
 
-def lxd_api_post(endpoint, data):
+def lxd_api_get(server, endpoint):
+    """
+    Get function for LXD API
+    :param endpoint:
+    :return: response:
+    """
+    cert = ('certs/' + server.key_public, 'certs/' + server.key_private)
+    r = requests.get(server.address + '/1.0/' + endpoint + '', verify=get_config()['verify'], cert=cert, timeout=100)
+    #print(r.text)
+    return r
+
+
+def lxd_api_post(server, endpoint, data):
     """
     Post function for LXD API
     :param endpoint:
     :param data:
     :return: response:
     """
+    cert = ('certs/' + server.key_public, 'certs/' + server.key_private)
+    r = requests.post(server.address + '/1.0/' + endpoint + '', verify=get_config()['verify'], cert=cert, data=json.dumps(data))
 
-    r = requests.post(get_config()['endpoint'] + '/1.0/' + endpoint + '', verify=get_config()['verify'], cert=get_config()['cert'], data=json.dumps(data))
+    #r = requests.post(get_config()['endpoint'] + '/1.0/' + endpoint + '', verify=get_config()['verify'], cert=get_config()['cert'], data=json.dumps(data))
     #print(r.text)
     return r
 
 
-def lxd_api_put(endpoint, data):
+def lxd_api_put(server, endpoint, data):
     """
     Put function for LXD API
     :param endpoint:
     :param data:
     :return: response:
     """
+    cert = ('certs/' + server.key_public, 'certs/' + server.key_private)
+    r = requests.put(server.address + '/1.0/' + endpoint + '', verify=get_config()['verify'], cert=cert,
+                     data=json.dumps(data))
 
-    r = requests.put(get_config()['endpoint'] + '/1.0/' + endpoint + '', verify=get_config()['verify'], cert=get_config()['cert'], data=json.dumps(data))
+    #r = requests.put(get_config()['endpoint'] + '/1.0/' + endpoint + '', verify=get_config()['verify'], cert=get_config()['cert'], data=json.dumps(data))
     #print(r.text)
     return r
 
 
-def lxd_api_patch(endpoint, data):
+def lxd_api_patch(server, endpoint, data):
     """
     Patch function for LXD API
     :param endpoint:
     :param data:
     :return: response:
     """
+    cert = ('certs/' + server.key_public, 'certs/' + server.key_private)
+    r = requests.patch(server.address + '/1.0/' + endpoint + '', verify=get_config()['verify'], cert=cert,
+                     data=json.dumps(data))
 
     r = requests.patch(get_config()['endpoint'] + '/1.0/' + endpoint + '', verify=get_config()['verify'], cert=get_config()['cert'], data=json.dumps(data))
     #print(r.text)
     return r
 
 
-def lxd_api_delete(endpoint):
+def lxd_api_delete(server, endpoint):
     """
     Delete function for LXD API
     :param endpoint:
     :return: response:
     """
+    cert = ('certs/' + server.key_public, 'certs/' + server.key_private)
+    r = requests.delete(server.address + '/1.0/' + endpoint + '', verify=get_config()['verify'], cert=cert)
 
-    r = requests.delete(get_config()['endpoint'] + '/1.0/' + endpoint + '', verify=get_config()['verify'], cert=get_config()['cert'])
+    #r = requests.delete(get_config()['endpoint'] + '/1.0/' + endpoint + '', verify=get_config()['verify'], cert=get_config()['cert'])
     #print(r.text)
     return r
 
 
-def lxd_api_get_config():
+def lxd_api_get_config(server):
     """
     Get function for get LXD API config
     :return: response:
     """
+    cert = ('certs/' + server.key_public, 'certs/' + server.key_private)
+    r = requests.get(server.address + '/1.0', verify=get_config()['verify'], cert=cert)
 
-    r = requests.get(get_config()['endpoint'] + '/1.0', verify=get_config()['verify'], cert=get_config()['cert'])
+    #r = requests.get(get_config()['endpoint'] + '/1.0', verify=get_config()['verify'], cert=get_config()['cert'])
     #print(r.text)
     return r
+
 
 def lxd_remote_get():
     """
@@ -385,3 +271,68 @@ def lxd_remote_get():
     r = requests.get('https://uk.images.linuxcontainers.org' + '/1.0/images/aliases?recursion=1', timeout=10)
     #print(r.text)
     return r
+
+
+def certificate_generator(
+    emailAddress="lxdmanager",
+    commonName="lxdmanager",
+    countryName="SK",
+    localityName="Slovakia",
+    stateOrProvinceName="Slovakia",
+    organizationName="lxdmanger",
+    organizationUnitName="lxdmanager",
+    serialNumber=0,
+    validityStartInSeconds=0,
+    validityEndInSeconds=10*365*24*60*60,
+    KEY_FILE="test_key.key",
+    CERT_FILE="test_key.crt"):
+
+    #can look at generated file using openssl:
+    #openssl x509 -inform pem -in selfsigned.crt -noout -text
+    # create a key pair
+    k = crypto.PKey()
+    k.generate_key(crypto.TYPE_RSA, 4096)
+    # create a self-signed cert
+    cert = crypto.X509()
+    cert.get_subject().C = countryName
+    cert.get_subject().ST = stateOrProvinceName
+    cert.get_subject().L = localityName
+    cert.get_subject().O = organizationName
+    cert.get_subject().OU = organizationUnitName
+    cert.get_subject().CN = commonName
+    cert.get_subject().emailAddress = emailAddress
+    cert.set_serial_number(serialNumber)
+    cert.gmtime_adj_notBefore(0)
+    cert.gmtime_adj_notAfter(validityEndInSeconds)
+    cert.set_issuer(cert.get_subject())
+    cert.set_pubkey(k)
+    cert.sign(k, 'sha512')
+    with open(CERT_FILE, "w") as f:
+        f.write(crypto.dump_certificate(crypto.FILETYPE_PEM, cert).decode("utf-8"))
+    with open(KEY_FILE, "w") as f:
+        f.write(crypto.dump_privatekey(crypto.FILETYPE_PEM, k).decode("utf-8"))
+
+
+def send_cert_to_server(server_name='lxd', server_address='https:127.0.0.1:8443', server_password=''):
+
+    key_file = 'certs/' + server_name + '_key.key'
+    cert_file = 'certs/' + server_name + '_key.crt'
+    certificate_generator(KEY_FILE=key_file, CERT_FILE=cert_file)
+
+    with open(cert_file, 'r') as f:
+        cert = ''.join(f.readlines()[1:-1])
+        f.close()
+
+    data = {
+        "type": "client",
+        "certificate": cert,
+        "name": server_name,
+        "password": server_password
+    }
+    #print(data)
+    data = json.dumps(data)
+    r = requests.post(server_address + '/1.0/' + 'certificates' + '', data=data, verify=False)
+    print(r.text)
+    return r
+
+

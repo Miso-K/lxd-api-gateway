@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 from app import app
-from lgw import scheduler_redis_job
+import logging
 
 try:
     host = app.config['HOST']
@@ -19,19 +19,18 @@ except KeyError:
     ssl = False
 
 
-
-from apscheduler.schedulers.background import BackgroundScheduler
-import atexit
-
-# The "apscheduler." prefix is hard coded
-scheduler = BackgroundScheduler(daemon=True)
-scheduler.add_job(scheduler_redis_job, 'interval', minutes=1)
-
-scheduler.start()
+# Logging settings for development using werkzeug server
+from flask.logging import default_handler
+handler = default_handler
+logging.getLogger('werkzeug').setLevel(logging.DEBUG)
+logging.getLogger('werkzeug').addHandler(handler)
+logging.getLogger('apscheduler.scheduler').setLevel(logging.INFO)
+logging.getLogger('apscheduler.scheduler').addHandler(handler)
+app.logger.setLevel(logging.DEBUG)
+app.logger.addHandler(handler)
 
 if ssl:
-	app.run(host=host, port=port, threaded=True, ssl_context=(app.config['SSL_CERT'], app.config['SSL_KEY']), debug=False)
+    app.run(host=host, port=port, threaded=True, ssl_context=(app.config['SSL_CERT'], app.config['SSL_KEY']), debug=False)
 else:
-	app.run(host=host, port=port, threaded=True, debug=False)
+    app.run(host=host, port=port, threaded=True, debug=False)
 
-atexit.register(lambda: scheduler.shutdown(wait=False))

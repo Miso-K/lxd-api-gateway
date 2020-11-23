@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 from flask import request
 from flask_restplus import Resource
-from flask_jwt_extended import fresh_jwt_required, jwt_required, create_access_token, \
-    jwt_refresh_token_required, create_refresh_token, get_jti, get_raw_jwt, get_jwt_identity
-from app import db, api, redis_store, app
+from flask_jwt_extended import jwt_required, create_access_token, \
+    jwt_refresh_token_required, create_refresh_token, get_jti, get_raw_jwt
+from app import app
 from .decorators import *
 from .fields.auth import *
 from .fields.users import *
@@ -12,11 +12,9 @@ from .fields.groups import *
 from .fields.abilities import *
 from .fields.requests import *
 from .fields.lxdconfig import *
-from .fields.lxdcerts import *
 import lgw
-import time
 import configparser
-import json
+# import time
 
 
 class Auth(Resource):
@@ -38,6 +36,7 @@ class Auth(Resource):
         user = User.query.filter_by(username=username).first()
 
         if not user or not user.verify_password(password):
+            app.logger.info('User: %s login fail', username)
             api.abort(code=401, message='Incorrect user or password')
 
         user.otp_confirmed = True
@@ -54,6 +53,7 @@ class Auth(Resource):
             access_jti = get_jti(encoded_token=access_token)
             redis_store.set('access_jti:' + user_ip + access_jti, 'false', app.config['OTP_ACCESS_TOKEN_EXPIRES'])
             # print(redis_store.get(access_jti) + ' ' + access_jti)
+            app.logger.info('User: %s logged, waiting for OTP', username)
             return ret
 
         access_token = create_access_token(identity=user, fresh=True)
@@ -64,6 +64,7 @@ class Auth(Resource):
         redis_store.set('refresh_jti:' + user_ip + refresh_jti, 'false', app.config['REFRESH_TOKEN_EXPIRES'])
         ret = {'access_token': access_token,
                'refresh_token': refresh_token}
+        app.logger.info('User: %s logged in', username)
         return ret
 
 
@@ -91,11 +92,14 @@ class AuthOtp(Resource):
 
         if user.get_otp_type() == 'totp':
             if not user.verify_totp(secret):
+                app.logger.info('User: %s incorrect secret code', user.username)
                 api.abort(code=401, message='Incorrect secret code')
         elif user.get_otp_type() == 'email':
             if not user.verify_eotp(secret):
+                app.logger.info('User: %s incorrect secret code', user.username)
                 api.abort(code=401, message='Incorrect secret code')
         else:
+            app.logger.info('User: %s incorrect OTP type', user.username)
             api.abort(code=401, message='Incorrect otp type')
 
         user.otp_confirmed = True
@@ -108,6 +112,7 @@ class AuthOtp(Resource):
         redis_store.set('refresh_jti:' + user_ip + refresh_jti, 'false', app.config['REFRESH_TOKEN_EXPIRES'])
         ret = {'access_token': access_token,
                'refresh_token': refresh_token}
+        app.logger.info('User: %s logged in', user.username)
         return ret
 
 
@@ -129,6 +134,7 @@ class AuthRefresh(Resource):
         ret = {
             'access_token': access_token
         }
+        app.logger.info('User: %s refresh token', user.username)
         return ret
 
 
@@ -158,8 +164,10 @@ class AuthLogout(Resource):
         jti = get_raw_jwt()['jti']
         user_ip = request.environ.get('HTTP_X_REAL_IP', request.remote_addr)
         if not jti:
+            app.logger.info('User: %s token not found - Logout', import_user().username)
             api.abort(code=404, message='Token not found')
         redis_store.set('access_jti:' + user_ip + jti, 'true', app.config['ACCESS_TOKEN_EXPIRES'])
+        app.logger.info('User: %s token revoked - Logout', import_user().username)
         return {"msg": "Access token revoked"}, 200
 
 
@@ -190,7 +198,9 @@ class UsersList(Resource):
         """
         current_identity = import_user()
         data = request.get_json()['data']
+        app.logger.debug('Create user data: %s', data)
         if User.query.filter_by(username=data['username']).first():
+            app.logger.info('User: %s already exists', data['username'])
             api.abort(code=409, message='User already exists')
 
         user = User()
@@ -240,6 +250,7 @@ class UsersList(Resource):
         db.session.add(user)
         db.session.commit()
 
+        app.logger.info('User: %s created successfully by %s', user.username, import_user().username)
         return {'data': user.__jsonapi__()}, 201
 
 
@@ -271,6 +282,7 @@ class Users(Resource):
         user = User.query.get(id)
 
         if not user:
+            app.logger.info('User not found for update')
             api.abort(code=404, message='User not found')
 
         data = request.get_json()['data']
@@ -319,6 +331,7 @@ class Users(Resource):
         if len(data) > 0:
             db.session.commit()
 
+        app.logger.info('User: %s updated successfully by %s', user.username, import_user().username)
         return {'data': user.__jsonapi__()}
 
     @user_has('users_delete')
@@ -329,11 +342,13 @@ class Users(Resource):
         user = User.query.get(id)
 
         if not user:
+            app.logger.info('User not found for delete')
             api.abort(code=404, message='User not found')
 
         db.session.delete(user)
         db.session.commit()
 
+        app.logger.info('User: %s deleted successfully by %s', user.username, import_user().username)
         return {}, 204
 
 
@@ -398,6 +413,7 @@ class Me(Resource):
                 if data['new_password'] == data['confirm_password']:
                     user.hash_password(data['new_password'])
             else:
+                app.logger.info('User: %s update with wrong password', user.username)
                 api.abort(code=401, message='Incorrect user or password')
 
         # Not secure for user to change his group or instance
@@ -405,6 +421,7 @@ class Me(Resource):
         if len(data) > 0:
             db.session.commit()
 
+        app.logger.info('User: %s updated successfully', user.username)
         return {'data': user.__jsonapi__()}
 
     # Stupid - user delete himself?
@@ -435,6 +452,7 @@ class MeOtp(Resource):
         user = User.query.get(current_identity.id)
 
         if not user:
+            app.logger.info('User not found when generate totp')
             api.abort(code=404, message='User not found')
 
         # if user has otp_secret do not create new
@@ -444,12 +462,17 @@ class MeOtp(Resource):
                 user.add_totp_secret()
             except Exception as e:
                 print(e)
-                api.abort(code=500, message='Can\'t generate otp secret')
+                app.logger.debug('Generate totp error: %s', e)
+                app.logger.info('User: %s cant generate totp secret', user.username)
+                api.abort(code=500, message='Can\'t generate totp secret')
         else:
-            api.abort(code=500, message='User has otp secret set')
+            app.logger.info('User: %s has totp secret yet', user.username)
+            api.abort(code=500, message='User has totp secret set')
 
         db.session.commit()
         json_ret = {'type': 'otp', 'otp_secret': user.otp_secret, 'otp_uri': user.get_totp_uri()}
+
+        app.logger.info('User: %s generate totp successfully', user.username)
         return {'data': json_ret}, 201
 
 
@@ -499,6 +522,7 @@ class GroupsList(Resource):
         db.session.add(group)
         db.session.commit()
 
+        app.logger.info('Group %s created successfully by %s', data['name'], import_user().username)
         return {'data': group.__jsonapi__()}, 201
 
 
@@ -555,6 +579,7 @@ class Groups(Resource):
         if len(data) > 0:
             db.session.commit()
 
+        app.logger.info('Group %s updated successfully by %s', group.name, import_user().username)
         return {'data': group.__jsonapi__()}
 
     @user_has('groups_delete')
@@ -570,6 +595,7 @@ class Groups(Resource):
         db.session.delete(group)
         db.session.commit()
 
+        app.logger.info('Group %s deleted successfully by %s', group.name, import_user().username)
         return {}, 204
 
 
@@ -626,6 +652,7 @@ class Abilities(Resource):
         except KeyError:
             pass
 
+        app.logger.info('Ability %s updated successfully by %s', ability.name, import_user().username)
         return {'data': ability.__jsonapi__()}
 
 
@@ -701,6 +728,8 @@ class RequestsList(Resource):
         #print(mail_message)
         lgw.get_config()
         lgw.send_request(data['message'], mail_message, usermail)
+
+        app.logger.info('Request created successfully by %s', import_user().username)
         return {'data': req.__jsonapi__()}, 201
 
 
@@ -772,6 +801,7 @@ class Requests(Resource):
 
         lgw.send_request(data['message'], mail_message, usermail)
 
+        app.logger.info('Request updated successfully by %s', import_user().username)
         return {'data': req.__jsonapi__()}
 
     @user_has('requests_delete')
@@ -787,13 +817,14 @@ class Requests(Resource):
         db.session.delete(req)
         db.session.commit()
 
+        app.logger.info('Request deleted successfully by %s', import_user().username)
         return {}, 204
 
 
 ##################
 # Other API #
 ##################
-class LXDConfig(Resource):
+class LgwConfig(Resource):
     decorators = [jwt_required, otp_confirmed]
 
     @user_has('config_infos')
@@ -877,11 +908,6 @@ class LXDConfig(Resource):
             try:
                 Config.read('lxdconfig.conf')
 
-                updateconf(Config, 'remote', 'endpoint')
-                updateconf(Config, 'remote', 'cert_crt')
-                updateconf(Config, 'remote', 'cert_key')
-                updateconf(Config, 'remote', 'verify')
-
                 updateconf(Config, 'smtp', 'enabled')
                 updateconf(Config, 'smtp', 'notify_user')
                 updateconf(Config, 'smtp', 'sender')
@@ -930,40 +956,6 @@ class LXDConfig(Resource):
             Config.write(cfgfile)
             cfgfile.close()
 
+        app.logger.info('LGW config updated successfully by %s', import_user().username)
         return {}, 200
 
-
-class LXDCerts(Resource):
-    decorators = [jwt_required, otp_confirmed]
-
-    @user_has('lxd_certs_create')
-    @api.marshal_with(lxdcerts_fields_get)
-    @api.expect(lxdcerts_fields_post, validate=True)
-    def post(self):
-        """
-        Update LXD connection certificates
-        :return status code
-        """
-        current_identity = import_user()
-
-        data = request.get_json()
-
-        config = configparser.ConfigParser()
-
-        try:
-            config.read('lxdconfig.conf')
-        except Exception as e:
-            print('wrong config file')
-
-        if current_identity.admin:
-            if data['cert_crt']:
-                f = open(config['remote']['cert_crt'], 'w')
-                f.write(data['cert_crt'])
-                f.close()
-
-            if data['cert_key']:
-                f = open(config['remote']['cert_key'], 'w')
-                f.write(data['cert_key'])
-                f.close()
-
-        return {}, 200

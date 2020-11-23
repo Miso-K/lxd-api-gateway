@@ -4,10 +4,6 @@ from flask_restplus import fields
 from app import api
 
 lxdconfig_fields_attributes = api.model('_LXDConfigAttributes', {
-    'endpoint': fields.String(),
-    'cert_crt': fields.String(),
-    'cert_key': fields.String(),
-    'verify': fields.String(),
     'sender': fields.String(),
     'recipient': fields.String(),
     'server': fields.String(),

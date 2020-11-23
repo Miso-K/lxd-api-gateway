@@ -61,34 +61,19 @@ users_fields_attributes_put = api.model('UsersFieldsAttributesPut', {
 users_fields_with_relationships_post_put = api.model('UsersFieldsWithRelationshipsPost', {
     'relationships': fields.Nested(api.model('UsersRelationshipsPost', {
         'groups': fields.Nested(api.model('GroupsDataPost', {
-            'type': fields.String,
-            'id': fields.Integer
+            'id': fields.Integer,
+            'name': fields.String
         }), as_list=True),
         'instances': fields.Nested(api.model('ContainersDataPost', {
-            'type': fields.String,
-            'id': fields.Integer
+            'id': fields.Integer,
+            'name': fields.String
         }), as_list=True)
     }))
 })
 
-users_fields_with_relationships_get = api.model('UsersFieldsWithRelationshipsPost', {
-    'relationships': fields.Nested(api.model('UsersRelationshipsPost', {
-        'groups': fields.Nested(api.model('GroupsDataPost', {
-            'id': fields.Integer,
-            'name': fields.String
-        }), as_list=True),
-        'instances': fields.Nested(api.model('ContainersDataPost', {
-            'id': fields.Integer,
-            'name': fields.String
-        }), as_list=True),
-        #'data': fields.Raw()
-    }))
-})
-
-_users_fields_get = api.inherit('UsersFieldsGet', users_fields_with_relationships_get, users_fields_attributes, {
+_users_fields_get = api.inherit('UsersFieldsGet', users_fields_with_relationships_post_put, users_fields_attributes, {
     'type': fields.String(default='users'),
     'id': fields.Integer,
-    #'attributes': fields.Nested(users_fields_attributes),
 })
 
 _users_fields_post = api.inherit('UsersFieldsPost', users_fields_with_relationships_post_put, users_fields_attributes_post, {

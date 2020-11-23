@@ -28,30 +28,42 @@ def populate_instances_table():
     Search for new or deleted instances and update their status in local database
     """
 
-    all = []
-    try:
-        res = lxd_api_get('instances')
-        for c in res.json()['metadata']:
-            all.append(c[15:])  # get instance name from api url
-    except Exception as e:
-        print(e)
+    database_lxdservers_list = Server.query.all()
+    for lxdserver in database_lxdservers_list:
+        all = []
+        try:
+            res = lxd_api_get(lxdserver, 'instances')
+            for c in res.json()['metadata']:
+                all.append(c[15:])  # get instance name from api url
+        except Exception as e:
+            print(e)
 
-    current_instances_list = tuple(all)
-    database_instances_list = [str(i.name) for i in Instance.query.all()]
+        current_instances_list = tuple(all)
+        database_instances_list = Instance.query.filter_by(location=lxdserver.name)
+        database_instances_list_names = [str(i.name) for i in database_instances_list]
 
-    # Removing old instances from database
-    for ct in database_instances_list:
-        if not ct in current_instances_list:
-            instance = Instance.query.filter_by(name=ct).first()
-            db.session.delete(instance)
+        # Removing old instances from database
+        for inst in database_instances_list:
+            if not inst.name in current_instances_list:
+                db.session.delete(inst)
+                db.session.commit()
+            if len(inst.servers) == 0:
+                db.session.delete(inst)
+                db.session.commit()
 
-    # Adding new instances to database
-    for ct in current_instances_list:
-        if not ct in database_instances_list:
-            instance = Instance(name=ct)
-            db.session.add(instance)
+        # Adding new instances to database
+        for cinst in current_instances_list:
+            if not cinst in database_instances_list_names:
+                instance = Instance()
+                instance.name = cinst
+                instance.location = lxdserver.name
+                db.session.add(instance)
+                db.session.commit()
 
-    db.session.commit()
+                lxdserver.instances.append(instance.id)
+                db.session.commit()
+
+        db.session.commit()
 
 
 def user_has(ability, get_user=import_user):

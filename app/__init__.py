@@ -10,9 +10,19 @@ from werkzeug.contrib.profiler import ProfilerMiddleware
 from werkzeug.exceptions import HTTPException
 import redis
 import os
+import logging
 
 app = Flask(__name__, instance_relative_config=True,
             template_folder='../templates')
+
+
+# Logging settings for production deployment with gunicorn
+gunicorn_logger = logging.getLogger('gunicorn.error')
+app.logger.handlers = gunicorn_logger.handlers
+app.logger.setLevel(gunicorn_logger.level)
+logger = app.logger
+
+
 
 
 # Load the default configuration
@@ -180,3 +190,14 @@ redis_store = redis.StrictRedis(host=app.config['REDIS_HOST'], port=app.config['
 from app import handlers, models, views, routes
 
 
+# Settings to run appscheduler
+from lgw import scheduler_redis_job
+from apscheduler.schedulers.background import BackgroundScheduler
+import atexit
+
+# The "apscheduler." prefix is hard coded
+scheduler = BackgroundScheduler(daemon=True)
+scheduler.add_job(scheduler_redis_job, 'interval', minutes=1)
+scheduler.start()
+app.logger.info('Scheduler is started')
+atexit.register(lambda: scheduler.shutdown(wait=False))

@@ -5,10 +5,9 @@ from flask_restplus import Resource
 from flask_jwt_extended import jwt_required
 from .decorators import *
 from .fields.instances import *
-from .fields.stats import *
 from .fields.snapshots import *
-from .fields.hosts import *
-from app import redis_store
+from .fields.lxdservers import *
+from app import redis_store, app
 import lgw
 import json
 # import time
@@ -32,22 +31,26 @@ class InstancesList(Resource):
         current_identity = import_user()
         instances = []
 
-        # starttime = time.time()
-        for c in Instance.query.all():
-            instance = Instance.query.filter_by(name=c.name).first()
-            if c.id in current_identity.instances or current_identity.admin:
-                instance_json = instance.__jsonapi__()
+        database_lxdservers_list = Server.query.all()
+        for lxdserver in database_lxdservers_list:
+            # starttime = time.time()
+            for c in Instance.query.filter_by(location=lxdserver.name):
+                #instance = Instance.query.filter_by(name=c.name).first()
+                if c.id in current_identity.instances or current_identity.admin:
+                    instance_json = c.__jsonapi__()
 
-                try:
-                    instance_json.update(json.loads(redis_store.get('instances:'+c.name+':info')))
-                    instance_json['state'] = (json.loads(redis_store.get('instances:' + c.name + ':state')))
-                except TypeError:
-                    res = lgw.lxd_api_get('instances/' + c.name)
-                    instance_json.update(res.json()['metadata'])
-                    res_state = lgw.lxd_api_get('instances/' + c.name + '/state')
-                    instance_json['state'] = res_state.json()['metadata']
 
-                instances.append(instance_json)
+                    try:
+                        instance_json.update(json.loads(redis_store.get('server:'+lxdserver.name+':instance:'+c.name+':info')))
+                        instance_json['state'] = (json.loads(redis_store.get('server:'+lxdserver.name+':instance:'+c.name+':state')))
+                    except TypeError:
+                        res = lgw.lxd_api_get(lxdserver, 'instances/' + c.name)
+                        #print(res.json())
+                        instance_json.update(res.json()['metadata'])
+                        res_state = lgw.lxd_api_get(lxdserver, 'instances/' + c.name + '/state')
+                        instance_json['state'] = res_state.json()['metadata']
+
+                    instances.append(instance_json)
 
         # print('time: ', time.time() - starttime)
         return {'data': instances}
@@ -70,30 +73,44 @@ class InstancesList(Resource):
         current_identity = import_user()
         data = request.get_json()['data']
         # print(data)
+
+        try:
+            servers_id = list(id['id'] for id in data['relationships']['servers'])
+            lxdserver = Server.query.filter_by(name=servers_id[0])
+        except KeyError:
+            pass
+        except AttributeError:
+            api.abort(code=500, message='Server doesn\'t exists')
         
         if 'name' in data:
             c = Instance.query.filter_by(name=data['name']).first()
             if not c:
+                app.logger.info('User: %s creating new container %s', current_identity.username, data['name'])
                 config = data['instance']
                 # if not admin, recalculate price
                 # if 'user.price' in config['config']:
                 #    config['config']['user.price'] = '5'
                 # print('Config2', config)
                 try:
-                    res = lgw.lxd_api_post('instances', data=config)
-                    print(res.text)
-                    print(res.status_code)
+                    res = lgw.lxd_api_post(lxdserver, 'instances', data=config)
+                    #print(res.text)
+                    #print(res.status_code)
                 except Exception as e:
                     api.abort(code=500, message='Can\'t create instance')
 
                 if res.status_code == 202:
                     # Add instance to database
-                    instance = Instance(name=data['name'])
+                    instance = Instance(name=data['name'], location=lxdserver.name)
                     db.session.add(instance)
                     db.session.commit()
                     # Get instance ID
                     instance = Instance.query.filter_by(
                         name=data['name']).first()
+
+                    # Add instance to server instances
+                    lxdserver.instances.append(instance.id)
+                    db.session.commit()
+
                     # Add instance to allowed users
                     if current_identity.admin:
                         try:
@@ -138,15 +155,20 @@ class Instances(Resource):
             # c = Instance.query.filter_by(name=name).first()  # USE FOR QUERY BY NAME
             c = Instance.query.filter_by(id=id).first()
             if c and (c.id in current_identity.instances or current_identity.admin):
-                res = lgw.lxd_api_get('instances/' + c.name)
+                lxdserver = Server.query.filter_by(name=c.location).first()
+                res = lgw.lxd_api_get(lxdserver, 'instances/' + c.name)
                 instance_json = c.__jsonapi__()
                 instance_json.update(res.json()['metadata'])
-                res_state = lgw.lxd_api_get('instances/' + c.name + '/state')
+                res_state = lgw.lxd_api_get(lxdserver, 'instances/' + c.name + '/state')
                 instance_json['state'] = res_state.json()['metadata']
 
                 # update redis data about instance
-                redis_store.set('instances:' + c.name + ':info', json.dumps(res.json()['metadata']))
-                redis_store.set('instances:' + c.name + ':state', json.dumps(res_state.json()['metadata']))
+                #redis_store.set('instances:' + c.name + ':info', json.dumps(res.json()['metadata']))
+                redis_store.set('server:' + lxdserver.name + ':instance:' + c.name + ':info',
+                                json.dumps(res.json()['metadata']))
+                #redis_store.set('instances:' + c.name + ':state', json.dumps(res_state.json()['metadata']))
+                redis_store.set('server:' + lxdserver.name + ':instance:' + c.name + ':state',
+                                json.dumps(res_state.json()['metadata']))
 
                 return {'data': instance_json}
             else:
@@ -180,12 +202,16 @@ class Instances(Resource):
 
         try:
             c = Instance.query.get(id)
+            lxdserver = Server.query.filter_by(name=c.location).first()
             if c.name and (id in current_identity.instances or current_identity.admin):
+
+                app.logger.info('User: %s updating container %s', current_identity.username, c.name)
+
                 if 'limits_cpu' in data['config']:
                     config = {
                               'config': {'limits.cpu': str(data['config']['limits_cpu'])}}
                     try:
-                        res = lgw.lxd_api_patch('instances/'+c.name, data=config)
+                        res = lgw.lxd_api_patch(lxdserver, 'instances/'+c.name, data=config)
                         # print(res.text)
                     except Exception as e:
                         api.abort(code=500, message='Can\'t create instance')
@@ -193,15 +219,14 @@ class Instances(Resource):
                     config = {
                         'config': {'limits.memory': data['config']['limits_memory']}}
                     try:
-                        res = lgw.lxd_api_patch('instances/'+c.name, data=config)
+                        res = lgw.lxd_api_patch(lxdserver, 'instances/'+c.name, data=config)
                         # print(res.text)
                     except Exception as e:
                         api.abort(code=500, message='Can\'t create instance')
 
                 # Delete redis cache
-                redis_store.delete('instances:' + c.name + ':info')
-                redis_store.delete('instances:' + c.name + ':state')
-
+                redis_store.delete('server:' + lxdserver.name + ':instance:' + c.name + ':info')
+                redis_store.delete('server:' + lxdserver.name + ':instance:' + c.name + ':state')
             else:
                 api.abort(code=404, message='Instance doesn\'t exists')
         except:
@@ -235,20 +260,24 @@ class Instances(Resource):
 
         try:
             c = Instance.query.get(id)
+            lxdserver = Server.query.filter_by(name=c.location).first()
             if c.name and (id in current_identity.instances or current_identity.admin):
+
+                app.logger.info('User: %s updating container %s', current_identity.username, c.name)
+
                 config = data['instance']
                 try:
-                    res = lgw.lxd_api_patch('instances/' + c.name, data=config)
-                    print(res.text)
-                    print(res.status_code)
+                    res = lgw.lxd_api_patch(lxdserver, 'instances/' + c.name, data=config)
+                    #print(res.text)
+                    #print(res.status_code)
                     if res.status_code == 500:
                         api.abort(code=500, message='Can\'t create instance')
                 except Exception as e:
                     api.abort(code=500, message='Can\'t create instance')
 
                 # Delete redis cache
-                redis_store.delete('instances:' + c.name + ':info')
-                redis_store.delete('instances:' + c.name + ':state')
+                redis_store.delete('server:' + lxdserver.name + ':instance:' + c.name + ':info')
+                redis_store.delete('server:' + lxdserver.name + ':instance:' + c.name + ':state')
 
             else:
                 api.abort(code=404, message='Instance doesn\'t exists')
@@ -275,12 +304,16 @@ class Instances(Resource):
 
         try:
             c = Instance.query.get(id)
+            lxdserver = Server.query.filter_by(name=c.location).first()
             # print(c)
         except:
             api.abort(code=404, message='Instance doesn\'t exists')
 
         if id in current_identity.instances or current_identity.admin:
-            res = lgw.lxd_api_delete('instances/' + c.name)
+
+            app.logger.info('User: %s deleting container %s', current_identity.username, c.name)
+
+            res = lgw.lxd_api_delete(lxdserver, 'instances/' + c.name)
             # print(res.status_code)
             if res.status_code == 400:
                 api.abort(code=404, message='Instance is running')
@@ -292,8 +325,8 @@ class Instances(Resource):
                 return {}, 204
 
             # Delete redis cache
-            redis_store.delete('instances:' + c.name + ':info')
-            redis_store.delete('instances:' + c.name + ':state')
+            redis_store.delete('server:' + lxdserver.name + ':instance:' + c.name + ':info')
+            redis_store.delete('server:' + lxdserver.name + ':instance:' + c.name + ':state')
 
         else:
             api.abort(code=404, message='Instance not found')
@@ -316,8 +349,9 @@ class InstancesState(Resource):
         try:
             # c = Instance.query.filter_by(name=name).first()  # USE FOR QUERY BY NAME
             c = Instance.query.filter_by(id=id).first()
+            lxdserver = Server.query.filter_by(name=c.location).first()
             if c and (c.id in current_identity.instances or current_identity.admin):
-                res = lgw.lxd_api_get('instances/' + c.name + '/state')
+                res = lgw.lxd_api_get(lxdserver, 'instances/' + c.name + '/state')
                 return {'data': res.json()}
             else:
                 api.abort(code=403, message='Unauthorized access')
@@ -333,249 +367,22 @@ class InstancesState(Resource):
             data = d
         else:
             data = request.get_json()['data']
-
+        #print(data)
         current_identity = import_user()
         try:
             # c = Instance.query.filter_by(name=name).first()  # USE FOR QUERY BY NAME
             c = Instance.query.filter_by(id=id).first()
+            lxdserver = Server.query.filter_by(name=c.location).first()
             if c and (c.id in current_identity.instances or current_identity.admin):
-                res = lgw.lxd_api_put('instances/' + c.name + '/state', data)
+                app.logger.info('User: %s updating container %s state to %s', current_identity.username, c.name, data['action'])
+
+                res = lgw.lxd_api_put(lxdserver, 'instances/' + c.name + '/state', data)
 
                 # Delete redis cache
-                redis_store.delete('instances:' + c.name + ':info')
-                redis_store.delete('instances:' + c.name + ':state')
-
+                redis_store.delete('server:' + lxdserver.name + ':instance:' + c.name + ':info')
+                redis_store.delete('server:' + lxdserver.name + ':instance:' + c.name + ':state')
+                #print(res.json())
                 return {'data': res.json()}
-            else:
-                api.abort(code=403, message='Unauthorized access')
-        except:
-            api.abort(code=404, message='Instance doesn\'t exists')
-
-
-class InstancesStart(Resource):
-    decorators = [jwt_required, otp_confirmed]
-
-    @user_has('instances_start')
-    @api.doc(responses={
-        200: 'Instance started',
-        404: 'Instance doesn\'t exists',
-        403: 'Start timed out'
-    })
-    def post(self, id):
-        """
-        Start instance
-        :param id:
-        :return status code
-        """
-
-        data = {
-            'action': 'start',
-            'timeout': 30
-        }
-
-        current_identity = import_user()
-        try:
-            # c = Instance.query.filter_by(name=name).first()  # USE FOR QUERY BY NAME
-            c = Instance.query.filter_by(id=id).first()
-            if c and (c.id in current_identity.instances or current_identity.admin):
-                res = lgw.lxd_api_put('instances/' + c.name + '/state', data)
-
-                # Delete redis cache
-                redis_store.delete('instances:' + c.name + ':info')
-                redis_store.delete('instances:' + c.name + ':state')
-
-                return res.json()
-            else:
-                api.abort(code=403, message='Unauthorized access')
-        except:
-            api.abort(code=404, message='Instance doesn\'t exists')
-
-
-class InstancesFreeze(Resource):
-    decorators = [jwt_required, otp_confirmed]
-
-    @user_has('instances_freeze')
-    @api.doc(responses={
-        204: 'Instance frozen',
-        404: 'Instance doesn\'t exists',
-        500: 'Freeze timed out'
-    })
-    def post(self, id):
-        """
-        Freeze instance
-        :param id:
-        :return data
-        """
-        data = {
-            'action': 'freeze',
-            'timeout': 30
-        }
-
-        current_identity = import_user()
-        try:
-            # c = Instance.query.filter_by(name=name).first()  # USE FOR QUERY BY NAME
-            c = Instance.query.filter_by(id=id).first()
-            if c and (c.id in current_identity.instances or current_identity.admin):
-                res = lgw.lxd_api_put('instances/' + c.name + '/state', data)
-
-                # Delete redis cache
-                redis_store.delete('instances:' + c.name + ':info')
-                redis_store.delete('instances:' + c.name + ':state')
-
-                return res.json()
-            else:
-                api.abort(code=403, message='Unauthorized access')
-        except:
-            api.abort(code=404, message='Instance doesn\'t exists')
-
-
-class InstancesUnfreeze(Resource):
-    decorators = [jwt_required, otp_confirmed]
-
-    @user_has('instances_unfreeze')
-    @api.doc(responses={
-        204: 'Instance thawed',
-        404: 'Instance doesn\'t exists',
-        500: 'Unfreeze timed out'
-    })
-    def post(self, id):
-        """
-        Unfreeze instance
-        :param id
-        :return data
-        """
-        data = {
-            'action': 'unfreeze',
-            'timeout': 30
-        }
-
-        current_identity = import_user()
-        try:
-            # c = Instance.query.filter_by(name=name).first()  # USE FOR QUERY BY NAME
-            c = Instance.query.filter_by(id=id).first()
-            if c and (c.id in current_identity.instances or current_identity.admin):
-                res = lgw.lxd_api_put('instances/' + c.name + '/state', data)
-
-                # Delete redis cache
-                redis_store.delete('instances:' + c.name + ':info')
-                redis_store.delete('instances:' + c.name + ':state')
-
-                return res.json()
-            else:
-                api.abort(code=403, message='Unauthorized access')
-        except:
-            api.abort(code=404, message='Instance doesn\'t exists')
-
-
-class InstancesStop(Resource):
-    decorators = [jwt_required, otp_confirmed]
-
-    @user_has('instances_stop')
-    @api.doc(responses={
-        204: 'Instance stopped',
-        404: 'Instance doesn\'t exists',
-        500: 'Stop timed out'
-    })
-    def post(self, id):
-        """
-        Stop instance
-        :param id:
-        :return data
-        """
-        data = {
-            'action': 'stop',
-            'timeout': 30
-        }
-
-        current_identity = import_user()
-        try:
-            # c = Instance.query.filter_by(name=name).first()  # USE FOR QUERY BY NAME
-            c = Instance.query.filter_by(id=id).first()
-            if c and (c.id in current_identity.instances or current_identity.admin):
-                res = lgw.lxd_api_put('instances/' + c.name + '/state', data)
-
-                # Delete redis cache
-                redis_store.delete('instances:' + c.name + ':info')
-                redis_store.delete('instances:' + c.name + ':state')
-
-                return res.json()
-            else:
-                api.abort(code=403, message='Unauthorized access')
-        except:
-            api.abort(code=404, message='Instance doesn\'t exists')
-
-
-class InstancesStopForce(Resource):
-    decorators = [jwt_required, otp_confirmed]
-
-    @user_has('instances_stop_force')
-    @api.doc(responses={
-        204: 'Instance stopped',
-        404: 'Instance doesn\'t exists',
-        500: 'Stop timed out'
-    })
-    def post(self, id):
-        """
-        Stop instance
-        :param id:
-        :return data
-        """
-        data = {
-            'action': 'stop',
-            'timeout': 30,
-            'force': True
-        }
-
-        current_identity = import_user()
-        try:
-            # c = Instance.query.filter_by(name=name).first()  # USE FOR QUERY BY NAME
-            c = Instance.query.filter_by(id=id).first()
-            if c and (c.id in current_identity.instances or current_identity.admin):
-                res = lgw.lxd_api_put('instances/' + c.name + '/state', data)
-
-                # Delete redis cache
-                redis_store.delete('instances:' + c.name + ':info')
-                redis_store.delete('instances:' + c.name + ':state')
-
-                return res.json()
-            else:
-                api.abort(code=403, message='Unauthorized access')
-        except:
-            api.abort(code=404, message='Instance doesn\'t exists')
-
-
-class InstancesRestart(Resource):
-    decorators = [jwt_required, otp_confirmed]
-
-    @user_has('instances_restart')
-    @api.doc(responses={
-        204: 'Instance restarted',
-        404: 'Instance doesn\'t exists',
-        500: 'Restart timed out'
-    })
-    def post(self, id):
-        """
-        Restart instance
-        :param id:
-        :return data
-        """
-        data = {
-            'action': 'restart',
-            'timeout': 30
-        }
-
-        current_identity = import_user()
-        try:
-            # c = Instance.query.filter_by(name=name).first()  # USE FOR QUERY BY NAME
-            c = Instance.query.filter_by(id=id).first()
-            if c and (c.id in current_identity.instances or current_identity.admin):
-                res = lgw.lxd_api_put('instances/' + c.name + '/state', data)
-
-                # Delete redis cache
-                redis_store.delete('instances:' + c.name + ':info')
-                redis_store.delete('instances:' + c.name + ':state')
-
-                return res.json()
             else:
                 api.abort(code=403, message='Unauthorized access')
         except:
@@ -607,10 +414,21 @@ class InstancesExec(Resource):
         try:
             # c = Instance.query.filter_by(name=name).first()  # USE FOR QUERY BY NAME
             c = Instance.query.filter_by(id=id).first()
+            lxdserver = Server.query.filter_by(name=c.location).first()
             if c and (c.id in current_identity.instances or current_identity.admin):
+
+                app.logger.info('User: %s starting console on container %s', current_identity.username, c.name)
+
                 #res = lgw.lxd_api_post('instances/' + c.name + '/console', {}) #bug with closing console
-                res = lgw.lxd_api_post('instances/' + c.name + '/exec', data)
-                return {'data': res.json()}
+                res = lgw.lxd_api_post(lxdserver, 'instances/' + c.name + '/exec', data)
+
+                relationships = lxdserver.get_as_relationships_exec()
+
+                res_meta = res.json()['metadata']
+                res_meta.update({'relationships': relationships})
+
+                #print(res_meta)
+                return {'data': res_meta}
             else:
                 api.abort(code=403, message='Unauthorized access')
         except:
@@ -634,9 +452,10 @@ class SnapshotsList(Resource):
         current_identity = import_user()
         instance = Instance.query.get(id)
         snapshots = []
+        lxdserver = Server.query.filter_by(name=instance.location).first()
 
         if instance.name and (id in current_identity.instances or current_identity.admin):
-            res = lgw.lxd_api_get('instances/' + instance.name + '/snapshots?recursion=1') #recursion=1 returns objects
+            res = lgw.lxd_api_get(lxdserver, 'instances/' + instance.name + '/snapshots?recursion=1') #recursion=1 returns objects
             for i, r in enumerate(res.json()['metadata']):
                 # print(r['name'] + r['created_at'] + str(r['stateful']))
                 snapshot_json = {'type': 'snapshots', 'id': i, 'attributes': {'name': r['name'], 'created_at': r['created_at'],
@@ -663,12 +482,15 @@ class SnapshotsList(Resource):
 
         current_identity = import_user()
         instance = Instance.query.get(id)
+        lxdserver = Server.query.filter_by(name=instance.location).first()
 
         if instance.name and (id in current_identity.instances or current_identity.admin):
+            app.logger.info('User: %s creating snapshot on container %s', current_identity.username, instance.name)
+
             if not instance:
                 api.abort(code=409, message='Snapshot name already exists')
             else:
-                res = lgw.lxd_api_post(
+                res = lgw.lxd_api_post(lxdserver,
                     'instances/' + instance.name + '/snapshots', {'name': data['name'], 'stateful': False})  # recursion=1 returns objects
                 # print(res.json())
                 return {'data': res.json()['metadata']}
@@ -687,10 +509,10 @@ class Snapshots(Resource):
         """
         current_identity = import_user()
         instance = Instance.query.get(id)
-
+        lxdserver = Server.query.filter_by(name=instance.location).first()
         if instance.name and (id in current_identity.instances or current_identity.admin):
             try:
-                res = lgw.lxd_api_get('instances/' + instance.name + '/snapshots/' + name)
+                res = lgw.lxd_api_get(lxdserver, 'instances/' + instance.name + '/snapshots/' + name)
                 r = res.json()['metadata']
                 # print(r)
                 snapshot_json = {'type': 'snapshots', 'attributes': {'name': r['name'], 'created_at': r['created_at'],
@@ -715,10 +537,13 @@ class Snapshots(Resource):
 
         current_identity = import_user()
         instance = Instance.query.get(id)
+        lxdserver = Server.query.filter_by(name=instance.location).first()
 
         if instance.name and (id in current_identity.instances or current_identity.admin):
             try:
-                res = lgw.lxd_api_get('instances/' + instance.name + '/snapshots/' + name)
+                app.logger.info('User: %s updating snapshot on container %s', current_identity.username, instance.name)
+
+                res = lgw.lxd_api_get(lxdserver, 'instances/' + instance.name + '/snapshots/' + name)
                 r = res.json()['metadata']
                 if r['expires_at']:
                     try:
@@ -738,13 +563,15 @@ class Snapshots(Resource):
         """
         current_identity = import_user()
         instance = Instance.query.get(id)
+        lxdserver = Server.query.filter_by(name=instance.location).first()
 
         if instance.name and (id in current_identity.instances or current_identity.admin):
             try:
-                resx = lgw.lxd_api_get('instances/' + instance.name + '/snapshots/' + name)
+                resx = lgw.lxd_api_get(lxdserver, 'instances/' + instance.name + '/snapshots/' + name)
+                app.logger.info('User: %s deleting snapshot on container %s', current_identity.username, instance.name)
                 if resx:
                     try:
-                        res = lgw.lxd_api_delete('instances/' + instance.name + '/snapshots/' + name)
+                        res = lgw.lxd_api_delete(lxdserver, 'instances/' + instance.name + '/snapshots/' + name)
                         return {}, 204
                     except:
                         api.abort(code=500, message='Error deleting snapshot')
@@ -769,13 +596,15 @@ class SnapshotsRestore(Resource):
         """
         current_identity = import_user()
         instance = Instance.query.get(id)
+        lxdserver = Server.query.filter_by(name=instance.location).first()
 
         if instance.name and (id in current_identity.instances or current_identity.admin):
             try:
-                resx = lgw.lxd_api_get('instances/' + instance.name + '/snapshots/' + name)
+                app.logger.info('User: %s restoring snapshot on container %s', current_identity.username, instance.name)
+                resx = lgw.lxd_api_get(lxdserver, 'instances/' + instance.name + '/snapshots/' + name)
                 if resx:
                     try:
-                        res = lgw.lxd_api_put('instances/' + instance.name, {'restore': name})
+                        res = lgw.lxd_api_put(lxdserver, 'instances/' + instance.name, {'restore': name})
                         return {}, 204
                     except:
                         api.abort(code=500, message='Error restoring snapshot')
@@ -798,8 +627,18 @@ class ImagesList(Resource):
         :return: images data
         """
 
-        res = lgw.lxd_api_get('images?recursion=1')
-        return {'data': res.json()['metadata']}
+        response = []
+        database_lxdservers_list = Server.query.all()
+        for lxdserver in database_lxdservers_list:
+            relationships = lxdserver.get_as_relationships()
+
+            res = lgw.lxd_api_get(lxdserver, 'images?recursion=1')
+            res_meta = res.json()['metadata']
+            for r in res_meta:
+                r.update({'relationships': relationships})
+            response += res_meta
+        #print(response)
+        return {'data': response}
 
     @user_has('images_create')
     def post(self):
@@ -809,31 +648,25 @@ class ImagesList(Resource):
         data = request.get_json()['data']
         current_identity = import_user()
         if current_identity.admin:
+            app.logger.info('User: %s creating new image', current_identity.username)
             res = lgw.lxd_api_post('images', data=data)
             return res.json()
-
-    @user_has('images_aliases_delete') # ?
-    def delete(self, alias):
-        """
-        Delete alias
-        """
-        res = lgw.lxd_api_delete('images/' + alias)
-        return res.json()['metadata']
 
 
 class Images(Resource):
     decorators = [jwt_required, otp_confirmed]
 
     @user_has('images_infos')
-    def get(self, fingerprint):
+    def get(self, server, fingerprint):
         """
         :return
         """
-        res = lgw.lxd_api_get('images/' + fingerprint)
+        lxdserver = Server.query.filter_by(name=server).first()
+        res = lgw.lxd_api_get(lxdserver, 'images/' + fingerprint)
         return {'data': res.json()['metadata']}
 
     @user_has('images_update')
-    def patch(self, fingerprint, d=None):
+    def patch(self, server, fingerprint, d=None):
         """
         Update image
         """
@@ -842,15 +675,19 @@ class Images(Resource):
         else:
             data = request.get_json()['data']
 
-        res = lgw.lxd_api_patch('images/' + fingerprint, data=data)
+        lxdserver = Server.query.filter_by(name=server).first()
+        app.logger.info('User: %s updating image %s', import_user().username, fingerprint)
+        res = lgw.lxd_api_patch(lxdserver, 'images/' + fingerprint, data=data)
         return res.json()['metadata']
 
     @user_has('images_delete')
-    def delete(self, fingerprint):
+    def delete(self, server, fingerprint):
         """
         Delete alias
         """
-        res = lgw.lxd_api_delete('images/' + fingerprint)
+        lxdserver = Server.query.filter_by(name=server).first()
+        app.logger.info('User: %s deleting image %s', import_user().username, fingerprint)
+        res = lgw.lxd_api_delete(lxdserver, 'images/' + fingerprint)
         return res.json()['metadata']
 
 
@@ -862,8 +699,18 @@ class ImagesAliasesList(Resource):
         """
         :return
         """
-        res = lgw.lxd_api_get('images/aliases')
-        return {'data': res.json()['metadata']}
+        response = []
+        database_lxdservers_list = Server.query.all()
+        for lxdserver in database_lxdservers_list:
+            relationships = lxdserver.get_as_relationships()
+
+            res = lgw.lxd_api_get(lxdserver, 'images/aliases')
+            res_meta = res.json()['metadata']
+            for r in res_meta:
+                r.update({'relationships': relationships})
+            response += res_meta
+        return {'data': response}
+
 
     @user_has('images_aliases_create')
     def post(self, d=None):
@@ -875,6 +722,7 @@ class ImagesAliasesList(Resource):
         else:
             data = request.get_json()['data']
 
+        app.logger.info('User: %s creating new image alias', import_user().username)
         res = lgw.lxd_api_post('images/aliases', data=data)
         return res.json()['metadata']
 
@@ -883,15 +731,16 @@ class ImagesAliases(Resource):
     decorators = [jwt_required, otp_confirmed]
 
     @user_has('images_aliases_infos')
-    def get(self, alias):
+    def get(self, server, alias):
         """
         :return
         """
-        res = lgw.lxd_api_get('images/aliases/' + alias)
+        lxdserver = Server.query.filter_by(name=server).first()
+        res = lgw.lxd_api_get(lxdserver, 'images/aliases/' + alias)
         return {'data': res.json()['metadata']}
 
     @user_has('images_aliases_update')
-    def put(self, alias, d=None):
+    def put(self, server, alias, d=None):
         """
         Update image
         """
@@ -900,11 +749,13 @@ class ImagesAliases(Resource):
         else:
             data = request.get_json()['data']
 
-        res = lgw.lxd_api_put('images/aliases/' + alias, data=data)
+        lxdserver = Server.query.filter_by(name=server).first()
+        app.logger.info('User: %s updating image alias %s', import_user().username, alias)
+        res = lgw.lxd_api_put(lxdserver, 'images/aliases/' + alias, data=data)
         return res.json()['metadata']
 
     @user_has('images_aliases_update')
-    def patch(self, alias, d=None):
+    def patch(self, server, alias, d=None):
         """
         Update image
         """
@@ -913,11 +764,13 @@ class ImagesAliases(Resource):
         else:
             data = request.get_json()['data']
 
-        res = lgw.lxd_api_patch('images/aliases/' + alias, data=data)
+        lxdserver = Server.query.filter_by(name=server).first()
+        app.logger.info('User: %s updating image alias %s', import_user().username, alias)
+        res = lgw.lxd_api_patch(lxdserver, 'images/aliases/' + alias, data=data)
         return res.json()['metadata']
 
     @user_has('images_aliases_update')
-    def post(self, alias, d=None):
+    def post(self, server, alias, d=None):
         """
         Rename image alias
         """
@@ -926,15 +779,19 @@ class ImagesAliases(Resource):
         else:
             data = request.get_json()['data']
 
-        res = lgw.lxd_api_post('images/aliases/' + alias, data=data)
+        lxdserver = Server.query.filter_by(name=server).first()
+        app.logger.info('User: %s rename image alias %s', import_user().username, alias)
+        res = lgw.lxd_api_post(lxdserver, 'images/aliases/' + alias, data=data)
         return res.json()['metadata']
 
     @user_has('images_aliases_delete')
-    def delete(self, alias):
+    def delete(self, server, alias):
         """
         Delete alias
         """
-        res = lgw.lxd_api_delete('images/aliases/' + alias)
+        lxdserver = Server.query.filter_by(name=server).first()
+        app.logger.info('User: %s deleting image alias %s', import_user().username, alias)
+        res = lgw.lxd_api_delete(lxdserver, 'images/aliases/' + alias)
         return res.json()['metadata']
 
 
@@ -956,205 +813,117 @@ class RemoteImagesList(Resource):
 
 
 ##################
-# Networks API #
+# Universal API #
 ##################
-class NetworksList(Resource):
+class UniversalsList(Resource):
     decorators = [jwt_required, otp_confirmed]
 
-    @user_has('networks_infos_all')
-    def get(self):
+    @user_has('universals_infos_all')
+    def get(self, url):
         """
-        Get networks list
-        :return: networks data
+        Get 'universal' list
+        :return: 'universal' data
         """
+        #if url in ['instances', 'containers', 'virtual-machines', 'cluster', 'resources', 'events', 'operations']:
+        #    api.abort(code=404, message='URL: '+url+' doesn\'t exists')
 
-        res = lgw.lxd_api_get('networks?recursion=1')
-        return {'data': res.json()['metadata']}
+        response = []
+        database_lxdservers_list = Server.query.all()
+        for lxdserver in database_lxdservers_list:
+            relationships = lxdserver.get_as_relationships()
+            res = lgw.lxd_api_get(lxdserver, url + '?recursion=1')
+            res_meta = res.json()['metadata']
+            # if response is list of objects
+            if isinstance(res_meta, list):
+                for r in res_meta:
+                    if not isinstance(r, str):
+                        r.update({'relationships': relationships})
+                response += res_meta
+            else:
+                res_meta.update({'relationships': relationships})
+                response.append(res_meta)
+        return {'data': response}
 
-    @user_has('networks_create')
-    def post(self):
+    @user_has('universals_create')
+    def post(self, url):
         """
-        create image
+        Create 'universal'
         """
         data = request.get_json()['data']
+        lxdserver = data.pop('lxdserver', None)
+        #print(data)
         current_identity = import_user()
-        if current_identity.admin:
-            res = lgw.lxd_api_post('networks', data=data)
+        if current_identity.admin and lxdserver:
+            app.logger.info('User: %s creating something on %s', import_user().username, url)
+            res = lgw.lxd_api_post(lxdserver, url, data=data)
             return res.json()
 
 
-##################
-# Profiles API #
-##################
-class ProfilesList(Resource):
+class Universals(Resource):
     decorators = [jwt_required, otp_confirmed]
 
-    @user_has('profiles_infos_all')
-    def get(self):
-        """
-        Get profiles list
-        :return: profiles data
-        """
-
-        res = lgw.lxd_api_get('profiles?recursion=1')
-        return {'data': res.json()['metadata']}
-
-    @user_has('profiles_create')
-    def post(self):
-        """
-        Create profile
-        """
-        data = request.get_json()['data']
-        current_identity = import_user()
-        if current_identity.admin:
-            res = lgw.lxd_api_post('profiles', data=data)
-            return res.json()
-
-
-class Profiles(Resource):
-    decorators = [jwt_required, otp_confirmed]
-
-    @user_has('profiles_infos')
-    def get(self, name):
+    @user_has('universals_infos')
+    def get(self, url, server, name):
         """
         :return
         """
-        res = lgw.lxd_api_get('profiles/' + name)
+        lxdserver = Server.query.filter_by(name=server).first()
+        res = lgw.lxd_api_get(lxdserver, url + '/' + name)
         return {'data': res.json()['metadata']}
 
-    @user_has('profiles_update')
-    def put(self, name, d=None):
+    @user_has('universals_update')
+    def put(self, url, server, name, d=None):
         """
-        Update profile
-        """
-        if d:
-            data = d
-        else:
-            data = request.get_json()['data']
-
-        res = lgw.lxd_api_put('profiles/' + name, data=data)
-        return res.json()['metadata']
-
-    @user_has('profiles_update')
-    def patch(self, name, d=None):
-        """
-        Update profile
+        Update 'universal'
         """
         if d:
             data = d
         else:
             data = request.get_json()['data']
 
-        res = lgw.lxd_api_patch('profiles/' + name, data=data)
+        lxdserver = Server.query.filter_by(name=server).first()
+        app.logger.info('User: %s updating something on %s', import_user().username, url)
+        res = lgw.lxd_api_put(lxdserver, url + '/' + name, data=data)
         return res.json()['metadata']
 
-    @user_has('profiles_update')
-    def post(self, name, d=None):
+    @user_has('universals_update')
+    def patch(self, url, server, name, d=None):
         """
-        Rename profile
+        Update 'universal'
         """
         if d:
             data = d
         else:
             data = request.get_json()['data']
 
-        res = lgw.lxd_api_post('profiles/' + name, data=data)
+        lxdserver = Server.query.filter_by(name=server).first()
+        app.logger.info('User: %s updating something on %s', import_user().username, url)
+        res = lgw.lxd_api_patch(lxdserver, url + '/' + name, data=data)
         return res.json()['metadata']
 
-    @user_has('profiles_delete')
-    def delete(self, name):
+    @user_has('universals_rename')
+    def post(self, url, server, name, d=None):
         """
-        Delete profile
-        """
-        res = lgw.lxd_api_delete('profiles/' + name)
-        return res.json()['metadata']
-
-
-##################
-# Projects API #
-##################
-class ProjectsList(Resource):
-    decorators = [jwt_required, otp_confirmed]
-
-    @user_has('projects_infos_all')
-    def get(self):
-        """
-        Get projects list
-        :return: projects data
-        """
-
-        res = lgw.lxd_api_get('projects?recursion=1')
-        return {'data': res.json()['metadata']}
-
-    @user_has('projects_create')
-    def post(self):
-        """
-        Create project
-        """
-        data = request.get_json()['data']
-        print(data)
-        current_identity = import_user()
-        if current_identity.admin:
-            res = lgw.lxd_api_post('projects', data=data)
-            return res.json()
-
-
-class Projects(Resource):
-    decorators = [jwt_required, otp_confirmed]
-
-    @user_has('projects_infos')
-    def get(self, name):
-        """
-        :return
-        """
-        res = lgw.lxd_api_get('projects/' + name)
-        return {'data': res.json()['metadata']}
-
-    @user_has('projects_update')
-    def put(self, name, d=None):
-        """
-        Update project
+        Rename 'universal'
         """
         if d:
             data = d
         else:
             data = request.get_json()['data']
 
-        res = lgw.lxd_api_put('projects/' + name, data=data)
+        lxdserver = Server.query.filter_by(name=server).first()
+        app.logger.info('User: %s renaming something on %s', import_user().username, url)
+        res = lgw.lxd_api_post(lxdserver, url + '/' + name, data=data)
         return res.json()['metadata']
 
-    @user_has('projects_update')
-    def patch(self, name, d=None):
+    @user_has('universals_delete')
+    def delete(self, url, server, name):
         """
-        Update project
+        Delete 'universal'
         """
-        if d:
-            data = d
-        else:
-            data = request.get_json()['data']
-
-        res = lgw.lxd_api_patch('projects/' + name, data=data)
-        return res.json()['metadata']
-
-    @user_has('projects_update')
-    def post(self, name, d=None):
-        """
-        Rename project
-        """
-        if d:
-            data = d
-        else:
-            data = request.get_json()['data']
-
-        res = lgw.lxd_api_post('projects/' + name, data=data)
-        return res.json()['metadata']
-
-    @user_has('projects_delete')
-    def delete(self, name):
-        """
-        Delete project
-        """
-        res = lgw.lxd_api_delete('projects/' + name)
+        lxdserver = Server.query.filter_by(name=server).first()
+        app.logger.info('User: %s deleting something on %s', import_user().username, url)
+        res = lgw.lxd_api_delete(lxdserver, url + '/' + name)
         return res.json()['metadata']
 
 
@@ -1166,66 +935,121 @@ class Operations(Resource):
     decorators = [jwt_required, otp_confirmed]
 
     @user_has('operations_infos')
-    def get(self, id):
+    def get(self, server, id):
         """
         Get images list
         :return: images data
         """
-        res = lgw.lxd_api_get('operations/' + id + '/wait')
+        lxdserver = Server.query.filter_by(name=server).first()
+        res = lgw.lxd_api_get(lxdserver, 'operations/' + id + '/wait')
         return res.json()
 
 
-class LxcHostResources(Resource):
+class LxdConfig(Resource):
     decorators = [jwt_required, otp_confirmed]
 
-    @user_has('resources_infos')
-    def get(self):
-        """
-        Get lxd host resources
-        :return data
-        """
-        json_output = lgw.lxd_api_get('resources').json()['metadata']
-        return {'data': json_output}
-
-
-class LxcCheckConfig(Resource):
-    decorators = [jwt_required, otp_confirmed]
-
-    @user_has('lxd_infos')
-    def get(self):
+    @user_has('lxd_server_infos')
+    def get(self, server):
         """
         Check LXC configuration (lxc-checkconfig)
         :return data
         """
-        conf = lgw.lxd_api_get_config().json()['metadata']
+        lxdserver = Server.query.filter_by(name=server).first()
+        conf = lgw.lxd_api_get_config(lxdserver).json()['metadata']
         return {'data': conf}
 
-        
-class CtsStats(Resource):
+
+class LxdServersList(Resource):
     decorators = [jwt_required, otp_confirmed]
 
-    @api.marshal_with(cts_stats_fields_get)
-    @user_has('stats_infos')
+    @user_has('servers_infos_all')
+    @api.marshal_with(lxdservers_fields_get_many)
     def get(self):
         """
-        Instances stats resources
-        :return data
+        Get list of used lxd servers
+        :return: data
+        """
+        servers = Server.query.all()
+        servers_list = []
+
+        for server in servers:
+            servers_list.append(server.__jsonapi__())
+            # update redis DB with actual servers list
+            redis_store.set('servers:' + server.name, json.dumps(server.__jsonapi__('redis')))
+
+        #print(servers_list)
+        return {'data': servers_list}
+
+    @user_has('servers_create')
+    @api.marshal_with(lxdservers_fields_get)
+    @api.expect(lxdservers_fields_post, validate=False)
+    def post(self):
+        """
+        Add new lxd server to lxdmanager
         """
 
-        populate_instances_table()
+        data = request.get_json()['data']
+        #print(data)
+
         current_identity = import_user()
-        alist = []
+        if current_identity.admin:
+            app.logger.info('User: %s adding new server to lxdmanager', import_user().username)
+            res = lgw.send_cert_to_server(data['name'], data['address'], data['password'])
 
-        all = []
-        res = lgw.lxd_api_get('instances')
-        for c in res.json()['metadata']:
-            all.append(c[15:])
+            server = Server()
 
-        for ct in all:
-            instance = Instance.query.filter_by(name=ct).first()
-            if instance.id in current_identity.instances or current_identity.admin:
-                alist.append(ct)
+            server.name = data['name']
+            server.address = data['address']
+            server.exec_address = data['exec_address']
+            server.verify = data['verify']
+            server.key_private = data['name'] + '_key.key'
+            server.key_public = data['name'] + '_key.crt'
 
-        json_output = lgw.cts_stats(alist, redis_store)
-        return {'data': json_output}
+            db.session.add(server)
+            db.session.commit()
+
+            # update redis DB with actual server
+            redis_store.set('servers:' + server.name, json.dumps(server.__jsonapi__('redis')))
+
+        return res.json()
+
+
+class LxdServers(Resource):
+    decorators = [jwt_required, otp_confirmed]
+
+    @user_has('servers_infos')
+    @api.marshal_with(lxdservers_fields_get)
+    def get(self, name):
+        """
+        Get lxd server by name
+        :return: data
+        """
+        server = Server.query.filter_by(name=name).first()
+        return {'data': server.__jsonapi__()}
+
+    @user_has('servers_delete')
+    def delete(self, name):
+        """
+        Delete lxd server by name
+        :return: data
+        """
+        server = Server.query.filter_by(name=name).first()
+        # delete server from redis DB
+        app.logger.info('User: %s deleting server on %s', import_user().username, name)
+        current_identity = import_user()
+        if current_identity.admin:
+            redis_store.delete('servers:' + server.name)
+            database_instances_list = Instance.query.filter_by(location=server.name)
+            for inst in database_instances_list:
+                db.session.delete(inst)
+                db.session.commit()
+
+            db.session.delete(server)
+            db.session.commit()
+
+            return {}, 204
+        return {}, 500
+
+
+
 

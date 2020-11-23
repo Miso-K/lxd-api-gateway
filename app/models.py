@@ -47,6 +47,13 @@ def _request_find(r):
     return request
 
 
+def _server_find(s):
+    server = Request.query.get(s)
+    if not (server):
+        raise ServerDoesntExist(s)
+    return server
+
+
 user_group_table = db.Table(
     'user_group',
     db.Column(
@@ -103,6 +110,19 @@ user_request_table = db.Table(
     )
 )
 
+server_instance_table = db.Table(
+    'server_instance',
+    db.Column(
+        'server_id',
+        db.Integer,
+        db.ForeignKey('servers.id')
+    ),
+    db.Column(
+        'instance_id',
+        db.Integer,
+        db.ForeignKey('instances.id')
+    )
+)
 
 class User(db.Model):
     __tablename__ = 'users'
@@ -286,9 +306,6 @@ class User(db.Model):
             return _json
 
         _json['relationships'] = {}
-        _json['relationships']['groups'] = {}
-        _json['relationships']['instances'] = {}
-        _json['relationships']['requests'] = {}
 
         _json['relationships']['groups'] = [
             group.__jsonapi__('flat') for group in self._groups]
@@ -356,8 +373,6 @@ class Group(db.Model):
             return _json
 
         _json['relationships'] = {}
-        #_json['relationships']['abilities'] = {}
-        #_json['relationships']['users'] = {}
 
         _json['relationships']['abilities'] = [
             ability.__jsonapi__('flat') for ability in self._abilities]
@@ -373,7 +388,8 @@ class Group(db.Model):
 class Ability(db.Model):
     __tablename__ = 'abilities'
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(30), unique=True)
+    name = db.Column(db.String(30), unique=False)
+    category = db.Column(db.String(30), unique=False)
     _groups = db.relationship(
         'Group',
         secondary=group_ability_table
@@ -387,10 +403,12 @@ class Ability(db.Model):
     def __init__(
         self,
         name=None,
+        category=None,
         groups=None
     ):
 
         self.name = name
+        self.category = category
 
         if groups and isinstance(groups, list):
             self.groups = [group for group in groups]
@@ -401,14 +419,14 @@ class Ability(db.Model):
         _json = {
             'type': 'abilities',
             'id': self.id,
-            'name': self.name
+            'name': self.name,
+            'category': self.category
         }
 
         if group == 'flat':
             return _json
 
         _json['relationships'] = {}
-        #_json['relationships']['groups'] = {}
 
         _json['relationships']['groups'] = [
             group.__jsonapi__('flat') for group in self._groups]
@@ -423,6 +441,7 @@ class Instance(db.Model):
     __tablename__ = 'instances'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(255), unique=True)
+    location = db.Column(db.String(255), unique=False)
     _users = db.relationship(
         'User',
         secondary=user_instance_table,
@@ -432,11 +451,22 @@ class Instance(db.Model):
         'id',
         creator=_user_find
     )
+    _servers = db.relationship(
+        'Server',
+        secondary=server_instance_table,
+    )
+    servers = association_proxy(
+        '_servers',
+        'id',
+        creator=_server_find
+    )
 
     def __init__(
         self,
         name=None,
-        users=None
+        location=None,
+        users=None,
+        servers=None
     ):
 
         self.name = name
@@ -445,6 +475,10 @@ class Instance(db.Model):
             self.users = [user for user in users]
         elif users and isinstance(users, int):
             self.users = [users]
+        if servers and isinstance(servers, list):
+            self.servers = [server for server in servers]
+        elif servers and isinstance(servers, int):
+            self.servers = [servers]
 
     def __jsonapi__(self, group=None):
         _json = {
@@ -457,10 +491,12 @@ class Instance(db.Model):
             return _json
 
         _json['relationships'] = {}
-        #_json['relationships']['users'] = {}
 
         _json['relationships']['users'] = [
             user.__jsonapi__('flat') for user in self._users]
+
+        _json['relationships']['servers'] = [
+            server.__jsonapi__('flat') for server in self._servers]
 
         return _json
 
@@ -527,7 +563,6 @@ class Request(db.Model):
             return _json
 
         _json['relationships'] = {}
-        #_json['relationships']['users'] = {}
 
         _json['relationships']['users'] = [
             user.__jsonapi__('flat') for user in self._users]
@@ -536,3 +571,96 @@ class Request(db.Model):
 
     def __repr__(self):
         return '<Request %r>' % self.id
+
+
+class Server(db.Model):
+    __tablename__ = 'servers'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(255), unique=True)
+    address = db.Column(db.String(255), unique=True)
+    exec_address = db.Column(db.String(255), unique=False)
+    key_private = db.Column(db.String(255), unique=True)
+    key_public = db.Column(db.String(255), unique=True)
+    verify = db.Column(db.String(255))
+
+    _instances = db.relationship(
+        'Instance',
+        secondary=server_instance_table,
+    )
+    instances = association_proxy(
+        '_instances',
+        'id',
+        creator=_instance_find
+    )
+
+    def __init__(
+        self,
+        name=None,
+        address=None,
+        exec_address=None,
+        key_private=None,
+        key_public=None,
+        verify=None,
+        instances=None
+    ):
+
+        self.name = name
+
+        if instances and isinstance(instances, list):
+            self.instances = [instance for instance in instances]
+        elif instances and isinstance(instances, int):
+            self.instances = [instances]
+
+    def get_as_relationships(self):
+        relationships = {
+            'servers': [
+                {
+                    'id': self.id,
+                    'name': self.name
+                }
+            ]
+        }
+        return relationships
+
+    def get_as_relationships_exec(self):
+        relationships = {
+            'servers': [
+                {
+                    'id': self.id,
+                    'name': self.name,
+                    'exec_address': self.exec_address
+                }
+            ]
+        }
+        return relationships
+
+    def __jsonapi__(self, group=None):
+        _json = {
+            'type': 'servers',
+            'id': self.id,
+            'name': self.name,
+            'address': self.address,
+            'exec_address': self.exec_address,
+            'verify': self.verify
+            #'key_private': self.key_private, # do not send private key info in REST API
+            #'key_public': self.key_public,
+        }
+
+        if group == 'flat':
+            return _json
+
+        if group == 'redis':
+            _json['key_private'] = self.key_private
+            _json['key_public'] = self.key_public
+            return _json
+
+        _json['relationships'] = {}
+
+        _json['relationships']['instances'] = [
+            instance.__jsonapi__('flat') for instance in self._instances]
+
+        return _json
+
+    def __repr__(self):
+        return '<Server %r>' % self.id
+

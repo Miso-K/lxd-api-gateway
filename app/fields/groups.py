@@ -20,7 +20,8 @@ groups_fields_with_relationships_post_put = api.model('GroupsFieldsWithRelations
         }), as_list=True),
         'abilities': fields.Nested(api.model('ContainersDataPost', {
             'id': fields.Integer,
-            'name': fields.String
+            'name': fields.String,
+            'category': fields.String
         }), as_list=True)
     }))
 })
