@@ -71,3 +71,6 @@ uwsgi.ini
 
 lxdconfig.conf
 lxdconfig.conf.bac
+
+certs/*.crt
+certs/*.key
