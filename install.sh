@@ -124,7 +124,7 @@ ls
 cd lxd-api-gateway
 source lgw-env/bin/activate
 source .env
-gunicorn app:app -b :5000 --preload --log-level info --access-logfile /home/ubuntu/lxd-api-gateway/logs/access.log --error-logfile /home/ubuntu/lxd-api-gateway/logs/error.log
+gunicorn app:app -b 127.0.0.1:5000 --preload --log-level info --access-logfile /home/ubuntu/lxd-api-gateway/logs/access.log --error-logfile /home/ubuntu/lxd-api-gateway/logs/error.log
 EOF
 '
 }

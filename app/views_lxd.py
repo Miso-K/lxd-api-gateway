@@ -617,7 +617,7 @@ class SnapshotsRestore(Resource):
 ##################
 # Images API #
 ##################
-class ImagesList(Resource):
+class ImagesListAll(Resource):
     decorators = [jwt_required, otp_confirmed]
 
     @user_has('images_infos_all')
@@ -637,19 +637,44 @@ class ImagesList(Resource):
             for r in res_meta:
                 r.update({'relationships': relationships})
             response += res_meta
-        #print(response)
+        # print(response)
+        return {'data': response}
+
+
+class ImagesList(Resource):
+    decorators = [jwt_required, otp_confirmed]
+
+    @user_has('images_infos_all')
+    def get(self, server):
+        """
+        Get images list from server x
+        :return: images data
+        """
+
+        response = []
+
+        lxdserver = Server.query.filter_by(name=server).first()
+        relationships = lxdserver.get_as_relationships()
+
+        res = lgw.lxd_api_get(lxdserver, 'images?recursion=1')
+        res_meta = res.json()['metadata']
+        for r in res_meta:
+            r.update({'relationships': relationships})
+        response += res_meta
+        # print(response)
         return {'data': response}
 
     @user_has('images_create')
-    def post(self):
+    def post(self, server):
         """
-        create image
+        create image on server x
         """
         data = request.get_json()['data']
         current_identity = import_user()
+        lxdserver = Server.query.filter_by(name=server).first()
         if current_identity.admin:
             app.logger.info('User: %s creating new image', current_identity.username)
-            res = lgw.lxd_api_post('images', data=data)
+            res = lgw.lxd_api_post(lxdserver, 'images', data=data)
             return res.json()
 
 
@@ -815,7 +840,7 @@ class RemoteImagesList(Resource):
 ##################
 # Universal API #
 ##################
-class UniversalsList(Resource):
+class UniversalsListAll(Resource):
     decorators = [jwt_required, otp_confirmed]
 
     @user_has('universals_infos_all')
@@ -844,14 +869,44 @@ class UniversalsList(Resource):
                 response.append(res_meta)
         return {'data': response}
 
+
+class UniversalsList(Resource):
+    decorators = [jwt_required, otp_confirmed]
+
+    @user_has('universals_infos_all')
+    def get(self, url, server):
+        """
+        Get 'universal' list
+        :return: 'universal' data
+        """
+        #if url in ['instances', 'containers', 'virtual-machines', 'cluster', 'resources', 'events', 'operations']:
+        #    api.abort(code=404, message='URL: '+url+' doesn\'t exists')
+
+        response = []
+        lxdserver = Server.query.filter_by(name=server).first()
+
+        relationships = lxdserver.get_as_relationships()
+        res = lgw.lxd_api_get(lxdserver, url + '?recursion=1')
+        res_meta = res.json()['metadata']
+        # if response is list of objects
+        if isinstance(res_meta, list):
+            for r in res_meta:
+                if not isinstance(r, str):
+                    r.update({'relationships': relationships})
+            response += res_meta
+        else:
+            res_meta.update({'relationships': relationships})
+            response.append(res_meta)
+        return {'data': response}
+
     @user_has('universals_create')
-    def post(self, url):
+    def post(self, url, server):
         """
         Create 'universal'
         """
         data = request.get_json()['data']
-        lxdserver = data.pop('lxdserver', None)
-        #print(data)
+        lxdserver = Server.query.filter_by(name=server).first()
+        # print(data)
         current_identity = import_user()
         if current_identity.admin and lxdserver:
             app.logger.info('User: %s creating something on %s', import_user().username, url)

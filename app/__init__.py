@@ -197,7 +197,7 @@ import atexit
 
 # The "apscheduler." prefix is hard coded
 scheduler = BackgroundScheduler(daemon=True)
-scheduler.add_job(scheduler_redis_job, 'interval', minutes=1)
+scheduler.add_job(scheduler_redis_job, 'interval', minutes=app.config['APPSCHEDULER_INTERVAL'])
 scheduler.start()
 app.logger.info('Scheduler is started')
 atexit.register(lambda: scheduler.shutdown(wait=False))
