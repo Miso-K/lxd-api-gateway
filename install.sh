@@ -67,16 +67,23 @@ location / {
 #ssl_certificate /etc/letsencrypt/live/api.example.com/fullchain.pem;
 #ssl_certificate_key /etc/letsencrypt/live/api.example.com/privkey.pem;
 
-# This section allow console connection
-#location /1.0/operations/ {
+# This section allow console connection for "server1" and "IP"
+#location /server1/1.0/operations/ {
 #     proxy_pass https://127.0.0.1:8443/1.0/operations/;
 #     proxy_set_header Upgrade \$http_upgrade;
 #     proxy_set_header Connection "upgrade";
 #  }
 
+# This section allow console connection for "server2" and "IP"
+#location /server2/1.0/operations/ {
+#     proxy_pass https://127.0.0.2:8443/1.0/operations/;
+#     proxy_set_header Upgrade \$http_upgrade;
+#     proxy_set_header Connection "upgrade";
+#  }
 
-#location / {
-#    proxy_pass http://127.0.0.1:5000/;
+
+#location /api/ {
+#    proxy_pass http://127.0.0.1:5000/api/;
 #    proxy_set_header Host \$host;
 #    proxy_set_header X-Forwarded-Proto \$scheme;
 #    proxy_set_header X-Real-IP \$remote_addr;
@@ -105,6 +112,10 @@ export ADMIN_PASSWORD='$PASSWD'
 EOF
 "
 
+# create folder for logs
+mkdir /home/ubuntu/lxd-api-gateway/logs
+chown ubuntu:ubuntu -R /home/ubuntu/lxd-api-gateway/logs
+
 # create a startup script to start the virtual environment, load the environment variables and start the app
 sudo bash -c 'cat > /home/ubuntu/lxd-api-gateway/startenv.sh <<EOF
 #!/bin/bash
@@ -113,7 +124,7 @@ ls
 cd lxd-api-gateway
 source lgw-env/bin/activate
 source .env
-gunicorn run:app --preload
+gunicorn app:app -b :5000 --preload --log-level info --access-logfile /home/ubuntu/lxd-api-gateway/logs/access.log --error-logfile /home/ubuntu/lxd-api-gateway/logs/error.log
 EOF
 '
 }
