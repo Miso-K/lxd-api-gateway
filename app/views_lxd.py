@@ -716,7 +716,7 @@ class Images(Resource):
         return res.json()['metadata']
 
 
-class ImagesAliasesList(Resource):
+class ImagesAliasesListAll(Resource):
     decorators = [jwt_required, otp_confirmed]
 
     @user_has('images_aliases_infos_all')
@@ -737,8 +737,27 @@ class ImagesAliasesList(Resource):
         return {'data': response}
 
 
+class ImagesAliasesList(Resource):
+    decorators = [jwt_required, otp_confirmed]
+
+    @user_has('images_aliases_infos_all')
+    def get(self, server):
+        """
+        :return
+        """
+        response = []
+        lxdserver = Server.query.filter_by(name=server).first()
+        relationships = lxdserver.get_as_relationships()
+
+        res = lgw.lxd_api_get(lxdserver, 'images/aliases')
+        res_meta = res.json()['metadata']
+        for r in res_meta:
+            r.update({'relationships': relationships})
+        response += res_meta
+        return {'data': response}
+
     @user_has('images_aliases_create')
-    def post(self, d=None):
+    def post(self, server, d=None):
         """
         Create image alias
         """
@@ -747,8 +766,9 @@ class ImagesAliasesList(Resource):
         else:
             data = request.get_json()['data']
 
+        lxdserver = Server.query.filter_by(name=server).first()
         app.logger.info('User: %s creating new image alias', import_user().username)
-        res = lgw.lxd_api_post('images/aliases', data=data)
+        res = lgw.lxd_api_post(lxdserver, 'images/aliases', data=data)
         return res.json()['metadata']
 
 

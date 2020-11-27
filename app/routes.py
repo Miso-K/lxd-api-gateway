@@ -63,7 +63,8 @@ nslxc.add_resource(Operations, '/operations/<string:server>/<string:id>')
 nslxc.add_resource(ImagesListAll, '/images')
 nslxc.add_resource(ImagesList, '/images/<string:server>')
 nslxc.add_resource(Images, '/images/<string:server>/<string:fingerprint>')
-nslxc.add_resource(ImagesAliasesList, '/images/aliases')
+nslxc.add_resource(ImagesAliasesListAll, '/images/aliases')
+nslxc.add_resource(ImagesAliasesList, '/images/aliases/<string:server>')
 nslxc.add_resource(ImagesAliases, '/images/aliases/<string:server>/<path:alias>')
 
 # Universal lxd routes
