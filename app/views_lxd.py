@@ -219,7 +219,7 @@ class Instances(Resource):
                     config = {
                         'config': {'limits.memory': data['config']['limits_memory']}}
                     try:
-                        res = lgw.lxd_api_patch(lxdserver, 'instances/'+c.name, data=config)
+                        res = lgw.format_users_listlxd_api_patch(lxdserver, 'instances/'+c.name, data=config)
                         # print(res.text)
                     except Exception as e:
                         api.abort(code=500, message='Can\'t create instance')
@@ -256,6 +256,7 @@ class Instances(Resource):
         else:
             data = request.get_json()['data']
 
+        #print(data)
         current_identity = import_user()
 
         try:
