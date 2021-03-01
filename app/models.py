@@ -470,6 +470,7 @@ class Instance(db.Model):
     ):
 
         self.name = name
+        self.location = location
 
         if users and isinstance(users, list):
             self.users = [user for user in users]

@@ -72,14 +72,15 @@ class InstancesList(Resource):
 
         current_identity = import_user()
         data = request.get_json()['data']
-        # print(data)
 
         try:
             servers_id = list(id['id'] for id in data['relationships']['servers'])
-            lxdserver = Server.query.filter_by(name=servers_id[0])
-        except KeyError:
+            lxdserver = Server.query.get(servers_id[0])
+        except KeyError as e:
+            app.logger.error('Error when creating new container %s', e)
             pass
-        except AttributeError:
+        except AttributeError as e:
+            app.logger.error('Error when creating new container %s', e)
             api.abort(code=500, message='Server doesn\'t exists')
         
         if 'name' in data:
@@ -87,15 +88,10 @@ class InstancesList(Resource):
             if not c:
                 app.logger.info('User: %s creating new container %s', current_identity.username, data['name'])
                 config = data['instance']
-                # if not admin, recalculate price
-                # if 'user.price' in config['config']:
-                #    config['config']['user.price'] = '5'
-                # print('Config2', config)
                 try:
                     res = lgw.lxd_api_post(lxdserver, 'instances', data=config)
-                    #print(res.text)
-                    #print(res.status_code)
                 except Exception as e:
+                    app.logger.error('Error when creating new container %s', e)
                     api.abort(code=500, message='Can\'t create instance')
 
                 if res.status_code == 202:
@@ -119,9 +115,11 @@ class InstancesList(Resource):
                                 user = User.query.get(user_id)
                                 user.instances.append(instance.id)
                                 db.session.commit()
-                        except KeyError:
+                        except KeyError as e:
+                            app.logger.error('Error when creating new container %s', e)
                             pass
                         except AttributeError:
+                            app.logger.error('Error when creating new container %s', e)
                             api.abort(code=500, message='User doesn\'t exists')
                     # Add instance to current user
                     else:
@@ -129,11 +127,11 @@ class InstancesList(Resource):
                         user.instances.append(instance.id)
                         db.session.commit()
                 else:
+                    app.logger.error('Error from lxd when creating new container %s', res.text)
                     api.abort(code=res.status_code, message='Error when creating instance')
 
-                # instance_json = instance.__jsonapi__()
-                # return {'data': instance_json}
                 return res.json()
+            app.logger.error('Conflict - instance already exists: %s', data['name'])
             api.abort(code=409, message='Instance already exists')
 
 
