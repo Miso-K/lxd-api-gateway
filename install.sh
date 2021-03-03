@@ -5,8 +5,8 @@ printf '=============Setup the environment=============== \n'
 sudo apt-get update
 sudo apt-get install -y python3 python3-pip
 pip3 install virtualenv
-sudo apt-get install nginx
-sudo apt-get install redis-server
+sudo apt-get install -y nginx
+sudo apt-get install -y redis-server
 }
 
 setupApp () {
