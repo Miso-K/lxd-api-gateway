@@ -2,17 +2,10 @@
 
 setupEnvrionment () {
 printf '=============Setup the environment=============== \n'
-cd ..
 sudo apt-get update
-sudo apt-get install software-properties-common
-#sudo add-apt-repository -y ppa:deadsnakes/ppa
-sudo apt-get update
-#printf '====== Set python3.7 as the default for python3 ======= \n'
-sudo apt-get install -y python3 python3-pip nginx python3-dev build-essential libssl-dev libffi-dev python3-setuptools
-#sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.5 1
-#sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.7 10
-#sudo update-alternatives --config python3
+sudo apt-get install -y python3 python3-pip
 pip3 install virtualenv
+sudo apt-get install nginx
 sudo apt-get install redis-server
 }
 
@@ -191,6 +184,17 @@ EOF
 
 }
 
+testAdminLogin () {
+printf '=============== Test Admin login access =============== \n'
+response=$(curl -so /dev/null -w '%{response_code}' -X POST "http://localhost/api/v1/auth" -H "Content-Type: application/json" -d '{ "username": "admin", "password": "'$PASSWD'"}')
+case "$response" in
+        200) printf "Received: HTTP $response -> Admin Login test SUCCESSFUL\n" ;;
+        401) printf "Received: HTTP $response -> Wrong username or password\n" ;;
+        404) printf "Received: HTTP $response -> Not Found\n" ;;
+          *) printf "Received: HTTP $response \n" ;;
+esac
+}
+
 run () {
 setupEnvrionment
 setupApp
@@ -200,6 +204,7 @@ setupAppDB
 setupStartService
 createCertificates
 setupAppConfig
+testAdminLogin
 }
 run
 
