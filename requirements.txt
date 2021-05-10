@@ -1,7 +1,7 @@
 wheel
 distro==1.0.4
 Flask==1.0
-Flask-Cors==3.0.3
+Flask-Cors==3.0.9
 Flask-JWT-Extended==3.18.0
 Flask-SQLAlchemy==2.2
 flask-restplus==0.12.1
