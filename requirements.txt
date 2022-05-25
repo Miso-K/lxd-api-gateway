@@ -15,4 +15,4 @@ requests
 gunicorn
 apscheduler
 pyOpenSSL
-PyJWT==1.7.1
+PyJWT==2.4.0
