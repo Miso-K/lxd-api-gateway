@@ -5,7 +5,7 @@ Flask-Cors==3.0.9
 Flask-JWT-Extended==3.18.0
 Flask-SQLAlchemy==2.2
 flask-restplus==0.12.1
-Werkzeug==0.16.1
+Werkzeug==2.2.3
 passlib==1.7.1
 psutil==5.6.6
 onetimepass==1.0.1
